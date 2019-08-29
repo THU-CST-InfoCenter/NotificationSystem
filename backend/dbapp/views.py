@@ -58,18 +58,20 @@ def check_login(f):
     @wraps(f)
     def inner(req, *arg, **kwargs):
         try:
-            data = json.loads(req.body)
-            if('username' in data.keys() and 'token' in data.keys()):
+            if('HTTP_X_ACCESS_TOKEN' in req.META.keys() and 'HTTP_X_ACCESS_USERNAME' in req.META.keys()):
                 pass
             else:
                 raise Exception()
         except:
             return JsonResponse({'status': -1, 'message': '非法请求'})
         try:
-            user = models.User.objects.get(username=data['username'])
+            header_username = req.META['HTTP_X_ACCESS_USERNAME']
+            header_token = req.META['HTTP_X_ACCESS_TOKEN']
+            user = models.User.objects.get(username=header_username)
             token = getToken(user, token_exp_time)
-            if(token == data['token']):
+            if(token == header_token):
                 updateToken(user)
+                kwargs['__user'] = user
                 return f(req, *arg, **kwargs)
             else:
                 return JsonResponse({'status': -1, 'message': '用户未登录'})
@@ -82,19 +84,21 @@ def check_admin(f):
     @wraps(f)
     def inner(req, *arg, **kwargs):
         try:
-            data = json.loads(req.body)
-            if('username' in data.keys() and 'token' in data.keys()):
+            if('HTTP_X_ACCESS_TOKEN' in req.META.keys() and 'HTTP_X_ACCESS_USERNAME' in req.META.keys()):
                 pass
             else:
                 raise Exception()
         except:
             return JsonResponse({'status': -1, 'message': '非法请求'})
         try:
-            user = models.AdminUser.objects.get(username=data['username'])
-            if(user.token == data['token']
+            header_username = req.META['HTTP_X_ACCESS_USERNAME']
+            header_token = req.META['HTTP_X_ACCESS_TOKEN']
+            user = models.AdminUser.objects.get(username=header_username)
+            if(user.token == header_token
                     and datetime.datetime.utcnow().replace(tzinfo=utc) - user.token_set_time >= datetime.timedelta(seconds=expire_time)):
                 user.token_set_time = datetime.datetime.utcnow().replace(tzinfo=utc)
                 user.save(force_update=True)
+                kwargs['__admin_user'] = user
                 return f(req, *arg, **kwargs)
             else:
                 return JsonResponse({'status': -1, 'message': '用户未登录'})
@@ -110,6 +114,17 @@ def check_post(f):
         else:
             return HttpResponseForbidden()
     return inner
+
+@csrf_exempt
+@check_post
+@check_login
+def debugCheckers(req, *arg, **kwargs):
+    result = {'status': 1}
+    if('__user' in kwargs.keys()):
+        result = {'status': 0, 'message': kwargs['__user'].username }
+    else:
+        result['message'] = 'Failed'
+    return JsonResponse(result)
 
 @csrf_exempt
 @check_post
