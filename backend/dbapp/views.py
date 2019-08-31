@@ -15,6 +15,7 @@ from config import *
 import uuid
 import sys
 import datetime
+import hashlib
 sys.path.append('../')
 
 
@@ -178,3 +179,70 @@ def adminLogin(req):
         print(e)
         result['message'] = '登录失败'
         return JsonResponse(result)
+
+@csrf_exempt
+def sendNotifyUpload(req):
+    if(req.method == 'POST'):
+        try:
+            result = {'status': 1}
+            username = req.POST.get('username')
+            token = req.POST.get('token')
+            f = req.FILES.get('file')
+            title = req.POST.get('title')
+            if(token == getToken(user)):
+                user = models.User.objects.get(username=username)
+                if(user.user_type == 2):
+                    updateToken(user)
+                    # do real work here
+                    f.seek(0)
+                    converted = mammoth.convert_to_html(f)
+                    html = converted.value
+                    models.Notify.objects.create(
+                        title=title, link=converted.value)
+                    result['status'] = 0
+                else:
+                    result['message'] = '无操作权限'
+            else:
+                result['status'] = -1
+                result['message'] = '用户未登录'
+        except Exception as e:
+            print(e)
+            result['message'] = '请求无效'
+        finally:
+            return JsonResponse(result)
+
+
+@check_admin
+@csrf_exempt
+def createStudentAccounts(req):
+    if(req.method == 'POST'):
+        result['status'] = -1
+        try:
+            result = {'status': 1}
+            username_col = req.POST.get('username_col')
+            name_col = req.POST.get('name_col')
+            pwd_col = req.POST.get('pwd_col')
+            db_settings_id = req.POST.get('db_settings_id')
+            f = req.FILES.get('file')
+            tempFilePath = f.temporary_file_path()
+            stuinfo = xlrd.open_workbook(tempFilePath)
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            for i in range(1,rownum):
+                stu_name = str(sheet0.cell_value(i,name_col))
+                stu_username = str(sheet0.cell_value(i,username_col))
+                stu_pwd = str(sheet0.cell_value(i,pwd_col))
+                stu_pwd = hashlib.md5(stu_pwd.encode(encoding='UTF-8')).hexdigest()
+                stu_info = {'username': stu_username,
+                    'name': stu_name,
+                    'password': stu_pwd,
+                    'email': 'null',
+                    'db_settings_id': db_settings_id}
+                models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
+            result['status'] = 0
+            result['newusers'] = rownum-1
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
