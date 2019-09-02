@@ -20,6 +20,9 @@
               />
             </el-form-item>
             <el-form-item>
+              <el-checkbox v-model="isAdmin">管理员登录</el-checkbox>
+            </el-form-item>
+            <el-form-item>
               <el-button class="btn" type="primary" @click="onSubmit('login')">登陆</el-button>
               <el-button class="btn" type="danger" @click="clearFrm()">清除</el-button>
             </el-form-item>
@@ -33,11 +36,13 @@
 <script>
 /* eslint-disable */
 let md5 = require('js-md5');
+import resChecker from '../api/common'
 
 export default {
   name: "login",
   data() {
     return {
+      isAdmin: false,
       checked: false,
       token: "",
       login: {
@@ -54,19 +59,16 @@ export default {
     onSubmit: function(login) {
       this.$refs[login].validate(valid => {
         if (valid) {
-          this.$http.post('userLogin', {'username': this.login.username, 'password': md5(this.login.password)}).then(response => {
+          this.$http.post(this.isAdmin ? 'adminLogin' : 'userLogin', {'username': this.login.username, 'password': md5(this.login.password)}).then(response => {
             let res = JSON.parse(response.bodyText)
-            if(res.status === 0) {
-            //if(true) {
-              window.sessionStorage.token = res.token
-              window.sessionStorage.username = res.username
-              window.sessionStorage.name = res.name
-              this.$http.post('debugCheckers', {}).then(response => {
-                console.log(response.bodyText)
-              })
-            } else {
-              swal({title:"出错了",text:res.message,icon:"error",button:"确定"});
-            }
+            let that = this
+            resChecker(res, ()=>{
+              window.sessionStorage.token = res.token;
+              window.sessionStorage.username = res.username;
+              window.sessionStorage.name = res.name;
+              window.sessionStorage.isAdmin = that.isAdmin;
+              that.$router.push(that.isAdmin ? '/admin' : '/home');
+            });
           }).catch(function(response) {
             console.log(response)
           })
