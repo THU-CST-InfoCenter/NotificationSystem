@@ -1,6 +1,11 @@
 /* eslint-disable */
 import Router from 'vue-router'
 import Login from '@/components/Login'
+import UserMain from '@/components/UserMain'
+import AdminMain from '@/components/AdminMain'
+import Notify from '@/components/Notify'
+import SendNotify from '@/components/SendNotify'
+import UserSettings from '@/components/UserSettings'
 
 const beforeEachHook = (to, from, next) => {
   if (to.meta.title) {
@@ -11,7 +16,7 @@ const beforeEachHook = (to, from, next) => {
       path: '/',
       query: { message: '未登录，现在跳转到登录页面' }
     })
-  } else if (to.meta.needAdmin && window.sessionStorage.user_type !== '2') {
+  } else if (to.meta.needAdmin && !window.sessionStorage.isAdmin) {
     next({
       path: '/home'
     })
@@ -39,6 +44,45 @@ const router = new Router({
       meta: {
         title: '系统登陆'
       }
+    },
+    {
+      /**
+       * Router for common users
+       */
+      path: '/home',
+      component: UserMain,
+      meta: userMeta,
+      children: [
+        {
+          path: 'notify',
+          component: Notify,
+          meta: userMeta
+        },
+      ]
+    },
+    {
+      /**
+       * Router for admins
+       */
+      path: '/admin',
+      component: AdminMain,
+      meta: adminMeta,
+      children: [
+        {
+          path: 'view_notify',
+          component: Notify,
+          meta: adminMeta
+        },
+        {
+          path: 'send_notify',
+          component: SendNotify,
+          meta: adminMeta
+        },{
+          path: 'user_settings',
+          component: UserSettings,
+          meta: adminMeta
+        }
+      ]
     },
     {
       path: '*',
