@@ -70,6 +70,18 @@ def putVariableImpl(name, value):
         print(e)
         return False
 
+def getCurrentDB():
+    id = getVariableImpl("curr_db_id", "")
+    if(id == ""):
+        return None
+    else:
+        id = int(id)
+        try:
+            db_settings = models.DBSettings.objects.get(id=id)
+            return db_settings
+        except:
+            return None
+
 def check_login(f):
     @wraps(f)
     def inner(req, *arg, **kwargs):
@@ -286,6 +298,8 @@ def editDB(req, **kwargs):
     finally:
         return JsonResponse(result)
 
+### Handlers for GET/PUT variables
+
 @csrf_exempt
 @check_post
 @check_admin
@@ -314,6 +328,120 @@ def putVariable(req, **kwargs):
             result['status'] = 0
         else:
             result['message'] = '无法写入设置'
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getCurrentDBId(req, **kwargs):
+    result = {'status': 1}
+    try:
+        res = getCurrentDB()
+        result['status'] = 0
+        result['data'] = "" if res is None else res.id
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+def getCurrentSystemTitle(req):
+    result = {}
+    try:
+        res = getCurrentDB()
+        if(res is None):
+            result['system_title'] = "通知系统"
+        else:
+            result['system_title'] = res.system_title
+    except Exception as e:
+        print(e)
+        result['system_title'] = "通知系统"
+    finally:
+        return JsonResponse(result)
+
+## Handlers for user groups
+@csrf_exempt
+@check_post
+@check_admin
+def getGroupList(req, **kwargs):
+    result = {'status': 1 }
+    try:
+        db = getCurrentDB()
+        if(db is None):
+            result['data'] = json.dumps({'json':[]})
+        else:
+            result['data'] = serializers.serialize(
+            'json', models.Group.objects.filter(db_settings=db))
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def addGroup(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        data = data['data']
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            ms = models.Group(
+            groupname=data['groupname'],
+            db_settings=db
+            )
+            ms.save()
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def delGroup(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            models.Group.objects.filter(id=data['data']).delete()
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def editGroup(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        data = data['data']
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            model = models.Group.objects.get(id=data['pk'])
+            model.groupname = data['groupname']
+            model.save(force_update=True)
+            result['status'] = 0
     except Exception as e:
         print(e)
         result['message'] = '操作失败'

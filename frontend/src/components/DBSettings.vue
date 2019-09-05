@@ -101,10 +101,10 @@ export default {
     load() {
       this.tableData = [];
       let that = this;
-      this.$http.post("getVariable", {'varname': db_varname }).then(response => {
+      this.$http.post("getCurrentDBId").then(response => {
         let res = JSON.parse(response.bodyText)
         this.resChecker(res, ()=>{
-          that.curDatabase = parseInt(res.data);
+          that.curDatabase = res.data;
         });
       }).catch(res => console.log(res))
       this.$http

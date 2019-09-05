@@ -7,6 +7,7 @@ import Notify from '@/components/Notify'
 import SendNotify from '@/components/SendNotify'
 import UserSettings from '@/components/UserSettings'
 import DBSettings from '@/components/DBSettings'
+import GroupSettings from '@/components/GroupSettings'
 
 const beforeEachHook = (to, from, next) => {
   if (to.meta.title) {
@@ -85,6 +86,10 @@ const router = new Router({
         },{
           path: 'db_settings',
           component: DBSettings,
+          meta: adminMeta
+        },{
+          path: 'group_settings',
+          component: GroupSettings,
           meta: adminMeta
         }
       ]

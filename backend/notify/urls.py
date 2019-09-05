@@ -29,5 +29,12 @@ urlpatterns = [
     path('editDB', views.editDB),
     ## put/get variables (for admin only)
     path('putVariable', views.putVariable),
-    path('getVariable', views.getVariable)
+    path('getVariable', views.getVariable),
+    ## Group settings
+    path('getGroupList', views.getGroupList),
+    path('addGroup', views.addGroup),
+    path('delGroup', views.delGroup),
+    path('editGroup', views.editGroup),
+    path('getCurrentDBId', views.getCurrentDBId),
+    path('getCurrentSystemTitle', views.getCurrentSystemTitle)
 ]

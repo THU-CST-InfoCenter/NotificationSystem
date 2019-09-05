@@ -4,7 +4,7 @@
       <el-header class="main-header" style="align-items: center;">
         <el-row align="middle" type="flex">
           <el-col :xs="5" :sm="4" :md="3" :lg="2" :xl="1">
-            <el-link :underline="false" type="info" style="font-size: 18px;">通知系统</el-link>
+            <el-link :underline="false" type="info" style="font-size: 18px;">管理后台</el-link>
           </el-col>
           <el-col :xs="8" :sm="16" :md="18">
             <el-menu
@@ -180,6 +180,11 @@ export default {
           link: "/admin/db_settings",
           name: "数据库选择",
           icon: "el-icon-setting"
+        },
+        {
+          link: "/admin/group_settings",
+          name: "用户组设置",
+          icon: "el-icon-connection"
         }
     ];
     let foundItem = false;
