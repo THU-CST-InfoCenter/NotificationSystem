@@ -1,38 +1,8 @@
 <template>
   <div>
-    <el-form :inline="true" ref="filter_form" :model="filter.conditions" label-width="50px">
-      <el-form-item
-        label="筛选"
-        :rules="[{ required: true, message: '字段不能为空', trigger: ['change','blur'] }]"
-        prop="db_name"
-      >
-        <el-select v-model="filter.conditions.db_name" placeholder="请选择当前DB">
-          <el-option
-            v-for="item in filter.db_names"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          ></el-option>
-        </el-select>
-      </el-form-item>
-    </el-form>
     <el-row type="flex" justify="start" align="start">
-      <el-col :span="16">
-        <el-upload
-          ref="upload"
-          action
-          :multiple="false"
-          accept=".xlsx,.xls"
-          :on-change="handleChange"
-          :file-list="fileList"
-          :limit="1"
-          :http-request="myUpload"
-          :auto-upload="false"
-        >
-        <el-button slot="trigger" type="primary">从Excel导入用户</el-button>
-        <el-button style="margin-left: 20px;" type="success" @click="onSubmitDocument">上传</el-button>
-        <div slot="tip" class="el-upload__tip">只能上传Excel文件</div>
-        </el-upload>
+      <el-col :span="4">
+        <el-button type="success" :click="addUserFromExcel">从Excel导入用户</el-button>
       </el-col>
     </el-row>
     <el-divider></el-divider>
@@ -94,25 +64,6 @@ export default {
       linkCb: function(link) {
         console.log(link)
       },
-      filter: {
-        conditions: {
-          db_name: ""
-        },
-        db_names: [
-          {
-            value: "0",
-            label: "2019夏令营"
-          },
-          {
-            value: "1",
-            label: "2019秋季推免"
-          },
-          {
-            value: "2",
-            label: "2019冬令营"
-          }
-        ]
-      }
     };
   },
   components: { List },
@@ -138,68 +89,6 @@ export default {
     },
     addUserFromExcel() {
       console.log('add_user')
-    },
-    myUpload(content) {
-      this.$refs["filter_form"].validate(valid => {
-      if (valid) {
-        let that = this;
-        let form = new FormData();
-        form.append("file", content.file);
-        form.append("token", window.sessionStorage.token);
-        form.append("username", window.sessionStorage.username);
-        form.append("name_col", 0);
-        form.append("pwd_col", 3);
-        form.append("username_col", 1);
-        form.append("db_settings_id", this.filter.conditions.db_name);
-        this.$http
-          .post("createStudentAccounts", form, {
-            headers: { "Content-Type": "multipart/form-data" },
-            progress(e) {
-              if (e.lengthComputable) {
-                let percent = (e.loaded / e.total) * 100;
-                content.onProgress({ percent: percent });
-              }
-            }
-          })
-          .then(response => {
-            let res = JSON.parse(response.bodyText);
-            if (res.status === 0) {
-              content.onSuccess();
-              that.$refs.upload.clearFiles();
-              swal({
-                title: "文件上传成功",
-                icon: "success",
-                button: "确定"
-              });
-            } else {
-              let that = this;
-              swal({
-                title: "出错了",
-                text: res.message,
-                icon: "error",
-                button: "确定"
-              }).then(val => {
-                if (res.status === -1) {
-                  that.$router.push("/");
-                }
-              });
-            }
-          })
-          .catch(function(res) {
-            console.log(res);
-          });
-      } else {
-          swal({
-            title: "错误",
-            text: "请选择完整筛选条件",
-            icon: "error",
-            button: "确定"
-          });
-      }
-      });
-    },
-    onSubmitDocument() {
-      this.$refs.upload.submit();
     }
   }
 };
