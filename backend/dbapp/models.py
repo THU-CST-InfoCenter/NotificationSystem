@@ -28,7 +28,9 @@ class AdminUser(models.Model):
 
 
 class Group(models.Model):
-    groupname = models.CharField(max_length=100, unique=True)
+    class Meta:
+        unique_together = ("groupname", "db_settings")
+    groupname = models.CharField(max_length=100)
     db_settings = models.ForeignKey(DBSettings, on_delete=models.CASCADE)
 
 

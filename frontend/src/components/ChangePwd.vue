@@ -41,10 +41,11 @@
 <script>
 /* eslint-disable */
 let md5 = require("js-md5");
-import resChecker from '../api/common'
+import ResChecker from '../api/common'
 
 export default {
   created() {},
+  mixins: [ResChecker],
   props: {
     disabled: {
       type: Boolean,
@@ -64,7 +65,7 @@ export default {
         })
         .then(response => {
           let res = JSON.parse(response.bodyText);
-          resChecker(res, ()=>swal({title:"修改成功",icon:"success",button:"确定"}).then(val => this.$router.go(0)));
+          this.resChecker(res, ()=>swal({title:"修改成功",icon:"success",button:"确定"}).then(val => this.$router.go(0)));
         })
         .catch(function(response) {
           console.log(response);

@@ -74,10 +74,10 @@
 <script>
 /* eslint-disable */
 import ResChecker from "../api/common";
-import resChecker from '../api/common';
 const db_varname = 'curr_db_id';
 
 export default {
+  mixins: [ResChecker],
   data() {
     return {
       elemWidth: 30,
@@ -103,7 +103,7 @@ export default {
       let that = this;
       this.$http.post("getVariable", {'varname': db_varname }).then(response => {
         let res = JSON.parse(response.bodyText)
-        ResChecker(res, ()=>{
+        this.resChecker(res, ()=>{
           that.curDatabase = parseInt(res.data);
         });
       }).catch(res => console.log(res))
@@ -111,7 +111,7 @@ export default {
         .post("getDBList")
         .then(response => {
           let json = JSON.parse(response.bodyText);
-          ResChecker(json, () => {
+          this.resChecker(json, () => {
             let arr = JSON.parse(json.data);
             // console.log(arr);
             arr.forEach(element => {
@@ -141,7 +141,7 @@ export default {
           .post("addDB", { data: this.dbRule })
           .then(response => {
             let json = JSON.parse(response.bodyText);
-            ResChecker(json, () => {
+            this.resChecker(json, () => {
               that.dialogVisible = false;
               swal({
                 title: "添加成功",
@@ -171,7 +171,7 @@ export default {
       this.$http.post("putVariable", {'varname': db_varname, 'value': String(this.curDatabase)}).then(response => {
         console.log(response)
         let res = JSON.parse(response.bodyText)
-        ResChecker(res, ()=>{
+        this.resChecker(res, ()=>{
           swal({title: "设置成功", icon: "success", button: "确定"});
         })
       }).catch(res => {
@@ -185,7 +185,7 @@ export default {
           .post("delDB", { data: this.tableData[idx]["pk"] })
           .then(response => {
             let json = JSON.parse(response.bodyText);
-            ResChecker(json, () => {
+            this.resChecker(json, () => {
               that.dialogVisible = false;
               swal({
                 title: "删除成功",
@@ -213,7 +213,7 @@ export default {
         .post("getDB", { data: this.tableData[idx].pk })
         .then(response => {
           let res = JSON.parse(response.bodyText);
-          ResChecker(res, () => {
+          this.resChecker(res, () => {
             that.dbRule.other_settings = res.data;
             that.editCallback = () => {
               let data = that.dbRule;
@@ -222,7 +222,7 @@ export default {
                 .post("editDB", { data: data })
                 .then(response => {
                   let json = JSON.parse(response.bodyText);
-                  ResChecker(json, () => {
+                  this.resChecker(json, () => {
                     swal({
                       title: "修改成功",
                       icon: "success",

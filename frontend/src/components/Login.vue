@@ -36,9 +36,10 @@
 <script>
 /* eslint-disable */
 let md5 = require('js-md5');
-import resChecker from '../api/common'
+import ResChecker from '../api/common'
 
 export default {
+  mixins: [ResChecker],
   name: "login",
   data() {
     return {
@@ -62,7 +63,7 @@ export default {
           this.$http.post(this.isAdmin ? 'adminLogin' : 'userLogin', {'username': this.login.username, 'password': md5(this.login.password)}).then(response => {
             let res = JSON.parse(response.bodyText)
             let that = this
-            resChecker(res, ()=>{
+            this.resChecker(res, ()=>{
               window.sessionStorage.token = res.token;
               window.sessionStorage.username = res.username;
               window.sessionStorage.name = res.name;
