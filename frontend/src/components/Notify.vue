@@ -98,7 +98,7 @@ export default {
       dialogVisible: false,
       dialogAdminVisible: false,
       msgContent: "",
-      isAdmin: window.sessionStorage.isAdmin,
+      isAdmin: window.sessionStorage.isAdmin == 1,
       msgDetailModel: {
         tableColumn: [
           {

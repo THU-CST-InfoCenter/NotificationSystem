@@ -4,7 +4,7 @@
       <el-header class="main-header" style="align-items: center;">
         <el-row align="middle" type="flex">
           <el-col :xs="5" :sm="4" :md="3" :lg="2" :xl="1">
-            <el-link :underline="false" type="info" style="font-size: 18px;">通知系统</el-link>
+            <el-link :underline="false" type="info" style="font-size: 18px;">{{ system_title }}</el-link>
           </el-col>
           <el-col :xs="8" :sm="16" :md="18">
             <el-menu
@@ -156,7 +156,8 @@ export default {
       name: "",
       sidebarItems: [],
       footerMsg: footer,
-      dialogFormVisible: false
+      dialogFormVisible: false,
+      system_title: "通知系统"
     };
   },
   created() {
@@ -183,6 +184,9 @@ export default {
       window.sessionStorage.name != null
     )
       this.name = window.sessionStorage.name;
+    this.$http.get('getCurrentSystemTitle').then(response => {
+      this.system_title = response.body.system_title;
+    }).catch(res => console.log(res));
   },
   methods: {
     handleSelect(key, keyPath) {
