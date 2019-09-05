@@ -7,6 +7,7 @@ from django.db import connections
 from django.core.paginator import Paginator
 from dbapp import models
 import requests
+import xlrd
 import urllib
 from django.utils.timezone import utc
 import urllib.parse
@@ -15,6 +16,7 @@ from config import *
 import uuid
 import sys
 import datetime
+import hashlib
 sys.path.append('../')
 
 
@@ -178,3 +180,144 @@ def adminLogin(req):
         print(e)
         result['message'] = '登录失败'
         return JsonResponse(result)
+
+@csrf_exempt
+def sendNotifyUpload(req):
+    if(req.method == 'POST'):
+        try:
+            result = {'status': 1}
+            username = req.POST.get('username')
+            token = req.POST.get('token')
+            f = req.FILES.get('file')
+            title = req.POST.get('title')
+            if(token == getToken(user)):
+                user = models.User.objects.get(username=username)
+                if(user.user_type == 2):
+                    updateToken(user)
+                    # do real work here
+                    f.seek(0)
+                    converted = mammoth.convert_to_html(f)
+                    html = converted.value
+                    models.Notify.objects.create(
+                        title=title, link=converted.value)
+                    result['status'] = 0
+                else:
+                    result['message'] = '无操作权限'
+            else:
+                result['status'] = -1
+                result['message'] = '用户未登录'
+        except Exception as e:
+            print(e)
+            result['message'] = '请求无效'
+        finally:
+            return JsonResponse(result)
+
+
+
+@csrf_exempt
+def createStudentAccounts(req):
+    #print("Ping")
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            username_col = int(req.POST.get('username_col'))
+            name_col = int(req.POST.get('name_col'))
+            pwd_col = int(req.POST.get('pwd_col'))
+            db_settings_id = req.POST.get('db_settings_id')
+            f = req.FILES.get('file')
+            f.seek(0)
+            #print("Load Files",name_col,pwd_col)
+            # tempFilePath = f.temporary_file_path()
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            #print(sheet0.cell_value(0,0),rownum)
+            for i in range(1,rownum):
+                stu_name = str(sheet0.cell_value(i,name_col))
+                stu_username = str(sheet0.cell_value(i,username_col))
+                stu_pwd = str(sheet0.cell_value(i,pwd_col))
+                stu_pwd = hashlib.md5(stu_pwd.encode(encoding='UTF-8')).hexdigest()
+                stu_info = {'username': stu_username,
+                    'name': stu_name,
+                    'password': stu_pwd,
+                    'email': 'null',
+                    'db_settings_id': db_settings_id}
+                models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
+            result['status'] = 0
+            result['newusers'] = rownum-1
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+
+@csrf_exempt
+def changeUsersGroupByExcel(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            username_col = int(req.POST.get('username_col'))
+            db_settings_id = int(req.POST.get('db_settings_id'))
+            group_id = int(req.POST.get('group_id'))
+            f = req.FILES.get('file')
+            f.seek(0)
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            #print(sheet0.cell_value(0,0),rownum)
+            for i in range(1,rownum):
+                stu_username = str(sheet0.cell_value(i,username_col))
+                models.User.objects.filter(username=stu_username,db_settings = db_settings_id).update(group=group_id)
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+
+@csrf_exempt
+def getNotifications(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            group_id = int(req.POST.get('group_id'))
+            db_settings_id = int(req.POST.get('db_settings_id'))
+            result['data']["notifications"] = models.Group.objects.filter(group = group_id, db_settings = db_settings_id)
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+        
+@csrf_exempt
+def getGroups(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            result['data']["groups"] = list(models.Group.objects.all())
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+
+@csrf_exempt
+def getNotificationStatus(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            notification_id = int(req.POST.get('notification_id'))
+            result['data']["notificationstatus"] = models.NotificationStatus.objects.filter(notification_id = notification_id)
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
