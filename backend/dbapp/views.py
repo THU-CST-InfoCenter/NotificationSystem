@@ -17,6 +17,7 @@ import uuid
 import sys
 import datetime
 import hashlib
+import os
 sys.path.append('../')
 
 
@@ -246,6 +247,7 @@ def createStudentAccounts(req, **kwargs):
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
+
 ### Handlers for DBSettings
 @csrf_exempt
 @check_post
@@ -284,6 +286,7 @@ def changeUsersGroupByExcel(req, **kwargs):
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
+
 def getDB(req, **kwargs):
     result = {'status': 1}
     try:
@@ -304,7 +307,8 @@ def getNotifications(req, **kwargs):
         result = {'status': 1}
         group_id = int(req.POST.get('group_id'))
         db_settings_id = int(req.POST.get('db_settings_id'))
-        result['data']["notifications"] = models.Group.objects.filter(group = group_id, db_settings = db_settings_id)
+        result['data'] = serializers.serialize(
+            'json', models.Notification.objects.filter(group = group_id, db_settings = db_settings_id))
         result['status'] = 0
     except Exception as e:
         print(e)
@@ -312,17 +316,10 @@ def getNotifications(req, **kwargs):
     finally:
         return JsonResponse(result)
         
+
 @csrf_exempt
 @check_post
-@check_admin
-def getGroups(req, **kwargs):
-    try:
-        result = {'status': 1}
-        result['data']["groups"] = list(models.Group.objects.all())
-        result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '服务器内部错误'
+@check_admin        
 def addDB(req, **kwargs):
     result = {'status': 1}
     try:
@@ -364,13 +361,18 @@ def getNotificationStatus(req, **kwargs):
     try:
         result = {'status': 1}
         notification_id = int(req.POST.get('notification_id'))
-        result['data']["notificationstatus"] = models.NotificationStatus.objects.filter(notification_id = notification_id)
+        result['data'] = serializers.serialize(
+            'json', models.NotificationStatus.objects.filter(notification_id = notification_id))
         result['status'] = 0
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
     finally:
         return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
 def editDB(req, **kwargs):
     result = {'status': 1}
     try:
@@ -535,5 +537,37 @@ def editGroup(req, **kwargs):
     except Exception as e:
         print(e)
         result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def sendNotificationUpload(req, **kwargs):
+    try:
+        result = {'status': 1}
+        f = req.FILES.get('file')
+        title = req.POST.get('title')
+        content = req.POST.get('content')
+        db_settings_id = int(req.POST.get('db_settings_id'))
+        visible_group_id = int(req.POST.get('visible_group_id'))
+        f.seek(0)
+        fdir = os.path.join(data_dir,f.name)
+        with open(fdir, 'wb+') as destination:
+            for chunk in f.chunks():
+                destination.write(chunk)
+        notification = models.Notification.objects.create(
+            title=title, content=ontent, attachment_arr=fdir, db_settings_id=db_settings_id, visible_group_id=visible_group_id)
+        if visible_group_id == -1:
+            users = list(models.User.objects.filter(db_settings_id = db_settings_id))
+        else:
+            users = models.User.objects.filter(db_settings_id = db_settings_id,group_id = visible_group_id)
+        for user in users:
+            models.NotificationStatus.objects.create(
+                status=0, notification_id=notification.id, user_id = user.id)
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
     finally:
         return JsonResponse(result)

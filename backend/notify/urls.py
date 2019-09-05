@@ -19,7 +19,7 @@ from dbapp import views
 urlpatterns = [
     path('userLogin', views.userLogin),
     path('adminLogin', views.adminLogin),
-    path('createStudentAccounts', views.createStudentAccounts)
+    path('createStudentAccounts', views.createStudentAccounts),
     ## for debug purpose
     path('debugCheckers', views.debugCheckers),
     ## DB settings
@@ -37,5 +37,10 @@ urlpatterns = [
     path('delGroup', views.delGroup),
     path('editGroup', views.editGroup),
     path('getCurrentDBId', views.getCurrentDBId),
-    path('getCurrentSystemTitle', views.getCurrentSystemTitle)
+    path('getCurrentSystemTitle', views.getCurrentSystemTitle),
+    path('getNotifications', views.getNotifications),
+    path('getNotificationStatus', views.getNotificationStatus),
+    path('sendNotificationUpload', views.sendNotificationUpload),
+    path('changeUsersGroupByExcel', views.changeUsersGroupByExcel),
+    path('createStudentAccounts', views.createStudentAccounts)
 ]
