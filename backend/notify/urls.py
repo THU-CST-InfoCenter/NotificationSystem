@@ -19,6 +19,23 @@ from dbapp import views
 urlpatterns = [
     path('userLogin', views.userLogin),
     path('adminLogin', views.adminLogin),
-    path('debugCheckers', views.debugCheckers),
     path('createStudentAccounts', views.createStudentAccounts)
+    ## for debug purpose
+    path('debugCheckers', views.debugCheckers),
+    ## DB settings
+    path('getDBList', views.getDBList),
+    path('addDB', views.addDB),
+    path('getDB', views.getDB),
+    path('delDB', views.delDB),
+    path('editDB', views.editDB),
+    ## put/get variables (for admin only)
+    path('putVariable', views.putVariable),
+    path('getVariable', views.getVariable),
+    ## Group settings
+    path('getGroupList', views.getGroupList),
+    path('addGroup', views.addGroup),
+    path('delGroup', views.delGroup),
+    path('editGroup', views.editGroup),
+    path('getCurrentDBId', views.getCurrentDBId),
+    path('getCurrentSystemTitle', views.getCurrentSystemTitle)
 ]
