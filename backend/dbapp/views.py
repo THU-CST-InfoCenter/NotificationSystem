@@ -418,7 +418,7 @@ def delGroup(req, **kwargs):
         if(db is None):
             raise Exception("No db is selected now")
         else:
-            models.Group.objects.filter(id=data['data']).delete()
+            models.Group.objects.filter(id=data['data'], db_settings=db).delete()
             result['status'] = 0
     except Exception as e:
         print(e)
@@ -438,7 +438,7 @@ def editGroup(req, **kwargs):
         if(db is None):
             raise Exception("No db is selected now")
         else:
-            model = models.Group.objects.get(id=data['pk'])
+            model = models.Group.objects.get(id=data['pk'], db_settings=db)
             model.groupname = data['groupname']
             model.save(force_update=True)
             result['status'] = 0
