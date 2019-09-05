@@ -253,24 +253,68 @@ def createStudentAccounts(req):
             return JsonResponse(result)
 
 @csrf_exempt
-def getUsersGroupByExcel(req):
+def changeUsersGroupByExcel(req):
     if(req.method == 'POST'):
         result = {'status': -1}
         try:
             result = {'status': 1}
             username_col = int(req.POST.get('username_col'))
-            db_settings_id = req.POST.get('db_settings_id')
-            group_id = req.POST.get('group_id')
+            db_settings_id = int(req.POST.get('db_settings_id'))
+            group_id = int(req.POST.get('group_id'))
             f = req.FILES.get('file')
             f.seek(0)
             stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
             sheet0 = stuinfo.sheet_by_index(0)
             rownum = sheet0.nrows
-            stuList = []
             #print(sheet0.cell_value(0,0),rownum)
             for i in range(1,rownum):
                 stu_username = str(sheet0.cell_value(i,username_col))
                 models.User.objects.filter(username=stu_username,db_settings = db_settings_id).update(group=group_id)
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+
+@csrf_exempt
+def getNotifications(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            group_id = int(req.POST.get('group_id'))
+            db_settings_id = int(req.POST.get('db_settings_id'))
+            result['data']["notifications"] = models.Group.objects.filter(group = group_id, db_settings = db_settings_id)
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+        
+@csrf_exempt
+def getGroups(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            result['data']["groups"] = list(models.Group.objects.all())
+            result['status'] = 0
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+
+@csrf_exempt
+def getNotificationStatus(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            notification_id = int(req.POST.get('notification_id'))
+            result['data']["notificationstatus"] = models.NotificationStatus.objects.filter(notification_id = notification_id)
             result['status'] = 0
         except Exception as e:
             print(e)
