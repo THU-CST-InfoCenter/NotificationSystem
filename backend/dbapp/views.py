@@ -7,6 +7,7 @@ from django.db import connections
 from django.core.paginator import Paginator
 from dbapp import models
 import requests
+import xlrd
 import urllib
 from django.utils.timezone import utc
 import urllib.parse
@@ -212,22 +213,26 @@ def sendNotifyUpload(req):
             return JsonResponse(result)
 
 
-@check_admin
+
 @csrf_exempt
 def createStudentAccounts(req):
+    #print("Ping")
     if(req.method == 'POST'):
-        result['status'] = -1
+        result = {'status': -1}
         try:
             result = {'status': 1}
-            username_col = req.POST.get('username_col')
-            name_col = req.POST.get('name_col')
-            pwd_col = req.POST.get('pwd_col')
+            username_col = int(req.POST.get('username_col'))
+            name_col = int(req.POST.get('name_col'))
+            pwd_col = int(req.POST.get('pwd_col'))
             db_settings_id = req.POST.get('db_settings_id')
             f = req.FILES.get('file')
-            tempFilePath = f.temporary_file_path()
-            stuinfo = xlrd.open_workbook(tempFilePath)
+            f.seek(0)
+            #print("Load Files",name_col,pwd_col)
+            # tempFilePath = f.temporary_file_path()
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
             sheet0 = stuinfo.sheet_by_index(0)
             rownum = sheet0.nrows
+            #print(sheet0.cell_value(0,0),rownum)
             for i in range(1,rownum):
                 stu_name = str(sheet0.cell_value(i,name_col))
                 stu_username = str(sheet0.cell_value(i,username_col))
@@ -241,6 +246,32 @@ def createStudentAccounts(req):
                 models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
             result['status'] = 0
             result['newusers'] = rownum-1
+        except Exception as e:
+            print(e)
+            result['message'] = '服务器内部错误'
+        finally:
+            return JsonResponse(result)
+
+@csrf_exempt
+def getUsersGroupByExcel(req):
+    if(req.method == 'POST'):
+        result = {'status': -1}
+        try:
+            result = {'status': 1}
+            username_col = int(req.POST.get('username_col'))
+            db_settings_id = req.POST.get('db_settings_id')
+            group_id = req.POST.get('group_id')
+            f = req.FILES.get('file')
+            f.seek(0)
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            stuList = []
+            #print(sheet0.cell_value(0,0),rownum)
+            for i in range(1,rownum):
+                stu_username = str(sheet0.cell_value(i,username_col))
+                models.User.objects.filter(username=stu_username,db_settings = db_settings_id).update(group=group_id)
+            result['status'] = 0
         except Exception as e:
             print(e)
             result['message'] = '服务器内部错误'

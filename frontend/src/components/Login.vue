@@ -24,7 +24,6 @@
             </el-form-item>
             <el-form-item>
               <el-button class="btn" type="primary" @click="onSubmit('login')">登陆</el-button>
-              <el-button class="btn" type="info" @click="AdminLogin('login')">管理员登录</el-button>
               <el-button class="btn" type="danger" @click="clearFrm()">清除</el-button>
             </el-form-item>
           </el-form>
@@ -70,28 +69,6 @@ export default {
               window.sessionStorage.isAdmin = that.isAdmin;
               that.$router.push(that.isAdmin ? '/admin' : '/home');
             });
-          }).catch(function(response) {
-            console.log(response)
-          })
-        }
-      });
-    },
-    AdminLogin: function(login) {
-      this.$refs[login].validate(valid => {
-        if (valid) {
-          this.$http.post('adminLogin', {'username': this.login.username, 'password': md5(this.login.password)}).then(response => {
-            let res = JSON.parse(response.bodyText)
-            if(res.status === 0) {
-            //if(true) {
-              window.sessionStorage.token = res.token
-              window.sessionStorage.username = res.username
-              window.sessionStorage.name = res.name
-              this.$http.post('debugCheckers', {}).then(response => {
-                console.log(response.bodyText)
-              })
-            } else {
-              swal({title:"出错了",text:res.message,icon:"error",button:"确定"});
-            }
           }).catch(function(response) {
             console.log(response)
           })
