@@ -6,6 +6,7 @@ import AdminMain from '@/components/AdminMain'
 import Notify from '@/components/Notify'
 import SendNotify from '@/components/SendNotify'
 import UserSettings from '@/components/UserSettings'
+import DBSettings from '@/components/DBSettings'
 
 const beforeEachHook = (to, from, next) => {
   if (to.meta.title) {
@@ -16,7 +17,7 @@ const beforeEachHook = (to, from, next) => {
       path: '/',
       query: { message: '未登录，现在跳转到登录页面' }
     })
-  } else if (to.meta.needAdmin && !window.sessionStorage.isAdmin) {
+  } else if (to.meta.needAdmin && window.sessionStorage.isAdmin == 0) {
     next({
       path: '/home'
     })
@@ -80,6 +81,10 @@ const router = new Router({
         },{
           path: 'user_settings',
           component: UserSettings,
+          meta: adminMeta
+        },{
+          path: 'db_settings',
+          component: DBSettings,
           meta: adminMeta
         }
       ]

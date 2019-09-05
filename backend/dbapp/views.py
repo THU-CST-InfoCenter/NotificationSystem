@@ -53,6 +53,22 @@ def getIpAddr(req):
     else:
         return req.META['REMOTE_ADDR']
 
+### put/get variables by names
+def getVariableImpl(name, default):
+    try:
+        res = models.Variables.objects.get(varname=name)
+        return res.value
+    except Exception as e:
+        print(e)
+        return default
+
+def putVariableImpl(name, value):
+    try:
+        models.Variables.objects.update_or_create(varname=name, defaults={'varname':name, 'value':value})
+        return True
+    except Exception as e:
+        print(e)
+        return False
 
 def check_login(f):
     @wraps(f)
@@ -87,6 +103,7 @@ def check_admin(f):
             if('HTTP_X_ACCESS_TOKEN' in req.META.keys() and 'HTTP_X_ACCESS_USERNAME' in req.META.keys()):
                 pass
             else:
+                print('Invalid Headers')
                 raise Exception()
         except:
             return JsonResponse({'status': -1, 'message': '非法请求'})
@@ -95,14 +112,15 @@ def check_admin(f):
             header_token = req.META['HTTP_X_ACCESS_TOKEN']
             user = models.AdminUser.objects.get(username=header_username)
             if(user.token == header_token
-                    and datetime.datetime.utcnow().replace(tzinfo=utc) - user.token_set_time >= datetime.timedelta(seconds=expire_time)):
+                    and datetime.datetime.utcnow().replace(tzinfo=utc) - user.token_set_time < datetime.timedelta(seconds=token_exp_time)):
                 user.token_set_time = datetime.datetime.utcnow().replace(tzinfo=utc)
                 user.save(force_update=True)
                 kwargs['__admin_user'] = user
                 return f(req, *arg, **kwargs)
             else:
                 return JsonResponse({'status': -1, 'message': '用户未登录'})
-        except:
+        except Exception as e:
+            print(e)
             return JsonResponse({'status': -1, 'message': '非法请求'})
     return inner
 
@@ -177,4 +195,127 @@ def adminLogin(req):
     except Exception as e:
         print(e)
         result['message'] = '登录失败'
+        return JsonResponse(result)
+
+
+### Handlers for DBSettings
+@csrf_exempt
+@check_post
+@check_admin
+def getDBList(req, **kwargs):
+    result = {'status': 1 }
+    try:
+        result['data'] = serializers.serialize(
+            'json', models.DBSettings.objects.all().order_by("-set_time"), fields=('id', 'system_title', 'alias', 'set_time'))
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getDB(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        result['data'] = models.DBSettings.objects.get(id=data['data']).other_settings
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def addDB(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        data = data['data']
+        ms = models.DBSettings(
+            alias=data['alias'],
+            system_title=data['system_title'],
+            other_settings=data['other_settings']
+        )
+        ms.save()
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def delDB(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        models.DBSettings.objects.filter(
+            id=data['data']).delete()
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def editDB(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        data = data['data']
+        model = models.DBSettings.objects.get(id=data['pk'])
+        model.alias = data['alias']
+        model.system_title = data['system_title']
+        model.other_settings = data['other_settings']
+        model.save(force_update=True)
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getVariable(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        res = getVariableImpl(data['varname'], "")
+        result['status'] = 0
+        result['data'] = res
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def putVariable(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        ok = putVariableImpl(data['varname'], data['value'])
+        if ok:
+            result['status'] = 0
+        else:
+            result['message'] = '无法写入设置'
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
         return JsonResponse(result)

@@ -175,6 +175,11 @@ export default {
           link: "/admin/user_settings",
           name: "用户管理",
           icon: "el-icon-user"
+        },
+        {
+          link: "/admin/db_settings",
+          name: "数据库选择",
+          icon: "el-icon-setting"
         }
     ];
     let foundItem = false;

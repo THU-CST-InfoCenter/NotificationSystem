@@ -11,6 +11,7 @@ class Variables(models.Model):
 class DBSettings(models.Model):
     alias = models.CharField(max_length=255, db_index=True, unique=True)
     system_title = models.CharField(max_length=255)
+    set_time = models.DateTimeField(auto_now_add=True)
     other_settings = models.TextField()  # JSON format
 
 # users that are not subject to the change of DBsettings

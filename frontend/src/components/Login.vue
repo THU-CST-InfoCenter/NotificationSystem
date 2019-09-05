@@ -66,7 +66,7 @@ export default {
               window.sessionStorage.token = res.token;
               window.sessionStorage.username = res.username;
               window.sessionStorage.name = res.name;
-              window.sessionStorage.isAdmin = that.isAdmin;
+              window.sessionStorage.isAdmin = that.isAdmin ? 1 : 0;
               that.$router.push(that.isAdmin ? '/admin' : '/home');
             });
           }).catch(function(response) {
