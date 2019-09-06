@@ -222,7 +222,8 @@ def createStudentAccounts(req, **kwargs):
         username_col = int(req.POST.get('username_col'))
         name_col = int(req.POST.get('name_col'))
         pwd_col = int(req.POST.get('pwd_col'))
-        db_settings_id = req.POST.get('db_settings_id')
+        db_settings_id = getCurrentDB().id
+        print(db_settings_id)
         f = req.FILES.get('file')
         f.seek(0)
         #print("Load Files",name_col,pwd_col)
@@ -232,6 +233,8 @@ def createStudentAccounts(req, **kwargs):
         rownum = sheet0.nrows
         #print(sheet0.cell_value(0,0),rownum)
         for i in range(1,rownum):
+            if i > 10:
+                break
             stu_name = str(sheet0.cell_value(i,name_col))
             stu_username = str(sheet0.cell_value(i,username_col))
             stu_pwd = str(sheet0.cell_value(i,pwd_col))
@@ -247,6 +250,8 @@ def createStudentAccounts(req, **kwargs):
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
+    finally:
+        return JsonResponse(result)
 
 ### Handlers for DBSettings
 @csrf_exempt
@@ -271,7 +276,7 @@ def changeUsersGroupByExcel(req, **kwargs):
     try:
         result = {'status': 1}
         username_col = int(req.POST.get('username_col'))
-        db_settings_id = int(req.POST.get('db_settings_id'))
+        db_settings_id = getCurrentDB().id
         group_id = int(req.POST.get('group_id'))
         f = req.FILES.get('file')
         f.seek(0)
@@ -306,7 +311,7 @@ def getNotifications(req, **kwargs):
     try:
         result = {'status': 1}
         group_id = int(req.POST.get('group_id'))
-        db_settings_id = int(req.POST.get('db_settings_id'))
+        db_settings_id = getCurrentDB().id
         result['data'] = serializers.serialize(
             'json', models.Notification.objects.filter(group = group_id, db_settings = db_settings_id))
         result['status'] = 0
@@ -549,7 +554,7 @@ def sendNotificationUpload(req, **kwargs):
         f = req.FILES.get('file')
         title = req.POST.get('title')
         content = req.POST.get('content')
-        db_settings_id = int(req.POST.get('db_settings_id'))
+        db_settings_id = getCurrentDB().id
         visible_group_id = int(req.POST.get('visible_group_id'))
         f.seek(0)
         fdir = os.path.join(data_dir,f.name)
@@ -565,6 +570,41 @@ def sendNotificationUpload(req, **kwargs):
         for user in users:
             models.NotificationStatus.objects.create(
                 status=0, notification_id=notification.id, user_id = user.id)
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def changeNotificationStatus(req, **kwargs):
+    try:
+        result = {'status': 1}
+        user_id = kwargs['__user'].id
+        notification_id = int(req.POST.get('notification_id'))
+        status = int(req.POST.get('status'))
+        models.NotificationStatus.objects.get(notification_id=notification_id, user_id=user_id).update(status=status)
+        result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getPersonalNotifications(req, **kwargs):
+    try:
+        result = {'status': 1}
+        user_id = kwargs['__user'].id
+        notification_id = int(req.POST.get('notification_id'))
+        status = int(req.POST.get('status'))
+        result['data'] = serializers.serialize(
+            'json', models.Notification.objects.filter(user_id=user_id).order_by("-time"))
         result['status'] = 0
     except Exception as e:
         print(e)
