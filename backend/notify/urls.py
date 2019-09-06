@@ -42,7 +42,6 @@ urlpatterns = [
     path('getNotificationStatus', views.getNotificationStatus),
     path('sendNotificationUpload', views.sendNotificationUpload),
     path('changeUsersGroupByExcel', views.changeUsersGroupByExcel),
-    path('createStudentAccounts', views.createStudentAccounts),
     path('changeNotificationStatus', views.changeNotificationStatus),
     path('getPersonalNotifications', views.getPersonalNotifications)
 ]

@@ -219,34 +219,38 @@ def adminLogin(req):
 def createStudentAccounts(req, **kwargs):
     try:
         result = {'status': 1}
-        username_col = int(req.POST.get('username_col'))
-        name_col = int(req.POST.get('name_col'))
-        pwd_col = int(req.POST.get('pwd_col'))
-        db_settings_id = getCurrentDB().id
-        print(db_settings_id)
-        f = req.FILES.get('file')
-        f.seek(0)
-        #print("Load Files",name_col,pwd_col)
-        # tempFilePath = f.temporary_file_path()
-        stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
-        sheet0 = stuinfo.sheet_by_index(0)
-        rownum = sheet0.nrows
-        #print(sheet0.cell_value(0,0),rownum)
-        for i in range(1,rownum):
-            if i > 10:
-                break
-            stu_name = str(sheet0.cell_value(i,name_col))
-            stu_username = str(sheet0.cell_value(i,username_col))
-            stu_pwd = str(sheet0.cell_value(i,pwd_col))
-            stu_pwd = hashlib.md5(stu_pwd.encode(encoding='UTF-8')).hexdigest()
-            stu_info = {'username': stu_username,
-                'name': stu_name,
-                'password': stu_pwd,
-                'email': 'null',
-                'db_settings_id': db_settings_id}
-            models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
-        result['status'] = 0
-        result['newusers'] = rownum-1
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            username_col = int(req.POST.get('username_col'))
+            name_col = int(req.POST.get('name_col'))
+            pwd_col = int(req.POST.get('pwd_col'))
+            db_settings_id = db.id
+            print(db_settings_id)
+            f = req.FILES.get('file')
+            f.seek(0)
+            #print("Load Files",name_col,pwd_col)
+            # tempFilePath = f.temporary_file_path()
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            #print(sheet0.cell_value(0,0),rownum)
+            for i in range(1,rownum):
+                if i > 10:
+                    break
+                stu_name = str(sheet0.cell_value(i,name_col))
+                stu_username = str(sheet0.cell_value(i,username_col))
+                stu_pwd = str(sheet0.cell_value(i,pwd_col))
+                stu_pwd = hashlib.md5(stu_pwd.encode(encoding='UTF-8')).hexdigest()
+                stu_info = {'username': stu_username,
+                    'name': stu_name,
+                    'password': stu_pwd,
+                    'email': 'null',
+                    'db_settings_id': db_settings_id}
+                models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
+            result['status'] = 0
+            result['newusers'] = rownum-1
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
@@ -274,20 +278,24 @@ def getDBList(req, **kwargs):
 @check_admin
 def changeUsersGroupByExcel(req, **kwargs):
     try:
-        result = {'status': 1}
-        username_col = int(req.POST.get('username_col'))
-        db_settings_id = getCurrentDB().id
-        group_id = int(req.POST.get('group_id'))
-        f = req.FILES.get('file')
-        f.seek(0)
-        stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
-        sheet0 = stuinfo.sheet_by_index(0)
-        rownum = sheet0.nrows
-        #print(sheet0.cell_value(0,0),rownum)
-        for i in range(1,rownum):
-            stu_username = str(sheet0.cell_value(i,username_col))
-            models.User.objects.filter(username=stu_username,db_settings = db_settings_id).update(group=group_id)
-        result['status'] = 0
+        result = {'status': 1}        
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            db_settings_id = db.id
+            username_col = int(req.POST.get('username_col'))
+            group_id = int(req.POST.get('group_id'))
+            f = req.FILES.get('file')
+            f.seek(0)
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            #print(sheet0.cell_value(0,0),rownum)
+            for i in range(1,rownum):
+                stu_username = str(sheet0.cell_value(i,username_col))
+                models.User.objects.filter(username=stu_username,db_settings = db_settings_id).update(group=group_id)
+            result['status'] = 0
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
@@ -311,10 +319,14 @@ def getNotifications(req, **kwargs):
     try:
         result = {'status': 1}
         group_id = int(req.POST.get('group_id'))
-        db_settings_id = getCurrentDB().id
-        result['data'] = serializers.serialize(
-            'json', models.Notification.objects.filter(group = group_id, db_settings = db_settings_id))
-        result['status'] = 0
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            db_settings_id = db.id
+            result['data'] = serializers.serialize(
+                'json', models.Notification.objects.filter(group = group_id, db_settings = db_settings_id))
+            result['status'] = 0
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
@@ -551,26 +563,30 @@ def editGroup(req, **kwargs):
 def sendNotificationUpload(req, **kwargs):
     try:
         result = {'status': 1}
-        f = req.FILES.get('file')
-        title = req.POST.get('title')
-        content = req.POST.get('content')
-        db_settings_id = getCurrentDB().id
-        visible_group_id = int(req.POST.get('visible_group_id'))
-        f.seek(0)
-        fdir = os.path.join(data_dir,f.name)
-        with open(fdir, 'wb+') as destination:
-            for chunk in f.chunks():
-                destination.write(chunk)
-        notification = models.Notification.objects.create(
-            title=title, content=ontent, attachment_arr=fdir, db_settings_id=db_settings_id, visible_group_id=visible_group_id)
-        if visible_group_id == -1:
-            users = list(models.User.objects.filter(db_settings_id = db_settings_id))
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
         else:
-            users = models.User.objects.filter(db_settings_id = db_settings_id,group_id = visible_group_id)
-        for user in users:
-            models.NotificationStatus.objects.create(
-                status=0, notification_id=notification.id, user_id = user.id)
-        result['status'] = 0
+            f = req.FILES.get('file')
+            title = req.POST.get('title')
+            content = req.POST.get('content')
+            db_settings_id = db.id
+            visible_group_id = int(req.POST.get('visible_group_id'))
+            f.seek(0)
+            fdir = os.path.join(data_dir,f.name)
+            with open(fdir, 'wb+') as destination:
+                for chunk in f.chunks():
+                    destination.write(chunk)
+            notification = models.Notification.objects.create(
+                title=title, content=content, attachment_arr=fdir, db_settings_id=db_settings_id, visible_group_id=visible_group_id)
+            if visible_group_id == -1:
+                users = list(models.User.objects.filter(db_settings_id = db_settings_id))
+            else:
+                users = models.User.objects.filter(db_settings_id = db_settings_id,group_id = visible_group_id)
+            for user in users:
+                models.NotificationStatus.objects.create(
+                    status=0, notification_id=notification.id, user_id = user.id)
+            result['status'] = 0
     except Exception as e:
         print(e)
         result['message'] = '请求无效'
@@ -601,8 +617,6 @@ def getPersonalNotifications(req, **kwargs):
     try:
         result = {'status': 1}
         user_id = kwargs['__user'].id
-        notification_id = int(req.POST.get('notification_id'))
-        status = int(req.POST.get('status'))
         result['data'] = serializers.serialize(
             'json', models.Notification.objects.filter(user_id=user_id).order_by("-time"))
         result['status'] = 0
