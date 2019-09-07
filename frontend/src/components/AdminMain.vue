@@ -177,15 +177,15 @@ export default {
           icon: "el-icon-user"
         },
         {
+          link: "/admin/group_settings",
+          name: "用户组设置",
+          icon: "el-icon-connection"
+        },
+        {
           link: "/admin/db_settings",
           name: "数据库选择",
           icon: "el-icon-setting"
         },
-        {
-          link: "/admin/group_settings",
-          name: "用户组设置",
-          icon: "el-icon-connection"
-        }
     ];
     let foundItem = false;
     for (let idx in this.sidebarItems) {

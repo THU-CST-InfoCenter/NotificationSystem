@@ -1,5 +1,10 @@
 from django.db import models
-
+from django.db.models.signals import pre_delete
+import os
+import json
+import sys
+sys.path.append('../')
+from config import *
 # used to store global configurations
 
 
@@ -35,7 +40,9 @@ class Group(models.Model):
 
 
 class User(models.Model):
-    username = models.CharField(max_length=100, db_index=True, unique=True)
+    class Meta:
+        unique_together = ("username", "db_settings")
+    username = models.CharField(max_length=100, db_index=True)
     name = models.CharField(max_length=100)
     password = models.CharField(max_length=50)
     email = models.EmailField()
@@ -83,6 +90,24 @@ class NotificationStatus(models.Model):
     # status == 2 => accept
     # status == 3 => reject
 
+def file_cleanup(sender, instance, *args, **kwargs):
+    '''
+        Deletes the file(s) associated with a model instance. The model
+        is not saved after deletion of the file(s) since this is meant
+        to be used with the pre_delete signal.
+    '''
+    try:
+        attachments = json.loads(instance.attachment_arr)
+        for f in attachments:
+            try:
+                os.remove(os.path.join(data_dir, f))
+            except Exception as e:
+                print(e)
+    except Exception as e:
+        print(e)
+    
+
+pre_delete.connect(file_cleanup, sender=Notification)
 
 def LogAction(action, username, ip, details=''):
     Log.objects.create(action=action, user=username, details=details, ip=ip)

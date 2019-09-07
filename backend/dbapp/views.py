@@ -20,6 +20,7 @@ import sys
 import datetime
 import hashlib
 import os
+from io import BytesIO
 sys.path.append('../')
 
 MSG_STATUS_ARR = [{
@@ -305,7 +306,12 @@ def createStudentAccounts(req, **kwargs):
                     'name': stu_name,
                     'password': stu_pwd,
                     'db_settings': db}
-                models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
+                user, created = models.User.objects.update_or_create(username=stu_username, db_settings=db, defaults=stu_info)
+                if(created):
+                    ## update notification settings
+                    entries = models.Notification.objects.filter(visible_group=None, db_settings=db)
+                    for notify in entries:
+                        models.NotificationStatus.objects.create(user=user, notification=notify, status=0)
             result['status'] = 0
             result['newusers'] = min(rownum, end_row + 1) - start_row
     except Exception as e:
@@ -325,20 +331,52 @@ def changeUsersGroupByExcel(req, **kwargs):
             raise Exception("No db is selected now")
         else:
             username_col = int(req.POST.get('username_col'))
-            group_id = int(req.POST.get('group_id'))
+            start_row = int(req.POST.get('start_row'))
+            end_row = int(req.POST.get('end_row'))
+            groupname_col = int(req.POST.get('groupname_col'))
             f = req.FILES.get('file')
             f.seek(0)
             stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
             sheet0 = stuinfo.sheet_by_index(0)
             rownum = sheet0.nrows
             #print(sheet0.cell_value(0,0),rownum)
-            for i in range(1,rownum):
+            changed = 0
+            unchanged = 0
+            for i in range(start_row,min(rownum, end_row+1)):
                 stu_username = str(sheet0.cell_value(i,username_col))
-                models.User.objects.filter(username=stu_username,db_settings = db).update(group=group_id)
+                groupname = str(sheet0.cell_value(i,groupname_col))
+                try:
+                    group = None if groupname is None or groupname == "" else models.Group.objects.get(groupname=groupname, db_settings=db)
+                    user = models.User.objects.get(username=stu_username, db_settings = db)
+                    if(user.group != group):
+                        # del old info
+                        if(user.group is not None):
+                            for item in models.NotificationStatus.objects.filter(user=user):
+                                if(item.notification.visible_group is not None):
+                                    item.delete()
+                        # push new information
+                        if(group is not None):
+                            for item in models.Notification.objects.filter(visible_group=group):
+                                models.NotificationStatus.objects.get_or_create(user=user, notification=item, defaults={
+                                    'user': user,
+                                    'notification': item,
+                                    'status': 0
+                                })
+                        user.group = group
+                        user.save(force_update=True)
+                        changed += 1
+                    else:
+                        unchanged += 1
+                except:
+                    unchanged += 1
+            result['changed'] = changed
+            result['unchanged'] = unchanged
             result['status'] = 0
     except Exception as e:
         print(e)
         result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
 
 @csrf_exempt
 @check_post
@@ -354,7 +392,7 @@ def getNotificationStatus(req, **kwargs):
             notification_id = int(data['id'])
             notification = models.Notification.objects.get(id=notification_id, db_settings=db)
             result['data'] = []
-            pages = Paginator(models.NotificationStatus.objects.filter(notification=notification).order_by("-status"), 15)
+            pages = Paginator(models.NotificationStatus.objects.filter(notification=notification).order_by("-status", "user_id"), 15)
             page = pages.page(data['page'])
             result['data'] = { 'page_cnt': pages.num_pages, 'count': pages.count, 'curr_entries': [] }
             seq = (data['page'] - 1) * 15
@@ -408,12 +446,6 @@ def delNotification(req, **kwargs):
             data = json.loads(req.body)['data']
             try:
                 model = models.Notification.objects.get(db_settings=db,id=data['id'], title=data['title'])
-                file_arr = json.loads(model.attachment_arr)
-                for f in file_arr:
-                    try:
-                        os.remove(os.path.join(data_dir, f))
-                    except:
-                        pass
                 model.delete()
             except:
                 pass
@@ -484,7 +516,10 @@ def sendNotification(req, **kwargs):
                         destination.write(chunk)
             notification = models.Notification.objects.create(
                 title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group)
-            users = models.User.objects.filter(group=visible_group, db_settings=db)
+            if(visible_group is not None):
+                users = models.User.objects.filter(group=visible_group, db_settings=db)
+            else:
+                users = models.User.objects.filter(db_settings=db)
             for user in users:
                 models.NotificationStatus.objects.update_or_create(notification=notification, user=user, defaults={
                     'notification': notification,
@@ -876,21 +911,26 @@ def changeUserInfoAdmin(req, **kwargs):
             user.email = data['email']
             if(data['pwd'] is not None and data['pwd'] != ""):
                 user.password = data['pwd']
+            group = None
             if(data['group'] is not None and data['group'] != ""):
                 group_id = int(data['group'])
                 group = models.Group.objects.get(id=group_id)
-                ## if user changes group, messages that are private in original group should be deleted
-                if(group != user.group):
-                    for item in models.NotificationStatus.objects.filter(user=user):
-                        if(item.notification.visible_group is not None):
-                            item.delete()
-                user.group = group
-            else:
+            ## if user changes group, messages that are private in original group should be deleted
+            if(group != user.group):
+                # del old information
                 if(user.group is not None):
                     for item in models.NotificationStatus.objects.filter(user=user):
                         if(item.notification.visible_group is not None):
                             item.delete()
-                user.group = None
+                # push new information
+                if(group is not None):
+                    for item in models.Notification.objects.filter(visible_group=group):
+                        models.NotificationStatus.objects.get_or_create(user=user, notification=item, defaults={
+                            'user': user,
+                            'notification': item,
+                            'status': 0
+                        })
+            user.group = group
             user.save(force_update=True)
             result['status'] = 0
     except Exception as e:
@@ -898,3 +938,66 @@ def changeUserInfoAdmin(req, **kwargs):
         result['message'] = '操作失败'
     finally:
         return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def downloadAttachmentAdmin(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)
+            nid = data['id']
+            fname = data['filename']
+            notification = models.Notification.objects.get(id=nid, db_settings=db)
+            arr = json.loads(notification.attachment_arr)
+            if(fname in arr):
+                response = HttpResponse(content_type='application/octet-stream')
+                response['Content-Disposition'] = 'attachment;filename="{}"'.format(fname)
+                response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+                with open(os.path.join(data_dir, fname), 'rb') as fin:
+                    data = BytesIO(fin.read())
+                    data.seek(0)
+                    response.write(data.getvalue())
+                    return response
+            else:
+                raise Exception("Invalid filename when trying to download attachment")
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_login
+def downloadAttachmentUser(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)
+            user = kwargs['__user']
+            nid = data['id']
+            fname = data['filename']
+            notification = models.Notification.objects.get(id=nid, db_settings=db)
+            arr = json.loads(notification.attachment_arr)
+            if(notification.visible_group is not None and notification.visible_group != user.group):
+                raise Exception("Unauthorized user found when trying to download attachment")
+            if(fname in arr):
+                response = HttpResponse(content_type='application/octet-stream')
+                response['Content-Disposition'] = 'attachment;filename=' + fname
+                with open(os.path.join(data_dir, fname), 'rb') as fin:
+                    data = BytesIO(fin.read())
+                    data.seek(0)
+                    response.write(data.getvalue())
+                    return response
+            else:
+                raise Exception("Invalid filename when trying to download attachment")
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'

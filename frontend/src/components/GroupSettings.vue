@@ -1,5 +1,46 @@
 <template>
   <div>
+    <el-row type="flex" justify="start" style="margin-bottom: 10px;">
+      <h3>上传Excel表格以修改用户所在组</h3>
+    </el-row>
+    <el-row type="flex">
+      <el-col :span="24">
+        <el-form :inline="true" :model="conf_model">
+          <el-form-item label="用户名所在列">
+            <el-input-number v-model="conf_model.username_col" :min="1" label="用户名所在列"></el-input-number>
+          </el-form-item>
+          <el-form-item label="用户组名字所在列">
+            <el-input-number v-model="conf_model.groupname_col" :min="1" label="姓名所在列"></el-input-number>
+          </el-form-item>
+          <el-form-item label="起始行号">
+            <el-input-number v-model="conf_model.start_row" :min="1" label="起始行号"></el-input-number>
+          </el-form-item>
+          <el-form-item label="终止行号">
+            <el-input-number v-model="conf_model.end_row" :min="1" label="终止行号"></el-input-number>
+          </el-form-item>
+        </el-form>
+      </el-col>
+    </el-row>
+    <el-row type="flex" justify="center" align="center">
+      <el-col :span="8" justify="center" align="center">
+        <el-upload
+          ref="upload"
+          action
+          :multiple="false"
+          accept=".xlsx, .xls"
+          :on-change="handleChange"
+          :file-list="fileList"
+          :limit="1"
+          :http-request="myUpload"
+          :auto-upload="false"
+        >
+          <el-button slot="trigger" type="primary">选择Excel文件</el-button>
+          <el-button style="margin-left: 20px;" type="success" @click="onSubmitDocument">上传</el-button>
+          <div slot="tip" class="el-upload__tip">只能上传Excel文件, 大小不能超过10M</div>
+        </el-upload>
+      </el-col>
+    </el-row>
+    <el-divider></el-divider>
     <el-table :data="tableData">
       <el-table-column prop="groupname" label="组名" width="280"></el-table-column>
       <el-table-column label="操作">
@@ -53,6 +94,12 @@ export default {
   mixins: [ResChecker],
   data() {
     return {
+      conf_model: {
+        username_col: 1,
+        groupname_col: 1,
+        start_row: 1,
+        end_row: 1
+      },
       elemWidth: 30,
       tableData: [],
       dialogVisible: false,
@@ -207,6 +254,46 @@ export default {
     confirmDelete() {
       if (this.deleteCallback) this.deleteCallback();
       this.confirmDialogVisible = false;
+    },
+    myUpload(content) {
+      let that = this;
+      let form = new FormData();
+      form.append("file", content.file);
+      form.append("token", window.sessionStorage.token);
+      form.append("username", window.sessionStorage.username);
+      form.append("groupname_col", this.conf_model.groupname_col - 1);
+      form.append("username_col", this.conf_model.username_col - 1);
+      form.append("start_row", this.conf_model.start_row - 1);
+      form.append("end_row", this.conf_model.end_row - 1);
+      this.$http
+        .post("changeUsersGroupByExcel", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+          progress(e) {
+            if (e.lengthComputable) {
+              let percent = (e.loaded / e.total) * 100;
+              content.onProgress({ percent: percent });
+            }
+          }
+        })
+        .then(response => {
+          let res = JSON.parse(response.bodyText);
+          this.resChecker(res, () => {
+            content.onSuccess();
+            that.$refs.upload.clearFiles();
+            swal({
+              title: "操作成功",
+              text: "修改了 " + res.changed + " 个用户的组信息， " + res.unchanged + " 个用户的组保持不变",
+              icon: "success",
+              button: "确定"
+            }).then(v => that.$router.go(0));
+          });
+        })
+        .catch(function(res) {
+          console.log(res);
+        });
+    },
+    onSubmitDocument() {
+      this.$refs.upload.submit();
     }
   }
 };

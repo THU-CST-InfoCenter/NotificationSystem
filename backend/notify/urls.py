@@ -53,5 +53,8 @@ urlpatterns = [
     path('changeUsersGroupByExcel', views.changeUsersGroupByExcel),
     path('getUserList', views.getUserList),
     path('getUserInfo', views.getUserInfo),
-    path('changeUserInfoAdmin', views.changeUserInfoAdmin)
+    path('changeUserInfoAdmin', views.changeUserInfoAdmin),
+    ## Download attachment
+    path('downloadAttachmentAdmin', views.downloadAttachmentAdmin),
+    path('downloadAttachmentUser', views.downloadAttachmentUser)
 ]

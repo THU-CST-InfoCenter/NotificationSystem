@@ -11,7 +11,12 @@
       <el-table-column label="操作">
         <template slot-scope="scope">
           <el-button size="mini" @click="handleDetails(scope.$index, scope.row)">查看详情</el-button>
-          <el-button size="mini" v-if="isAdmin" @click="handleStatus(scope.$index, scope.row)" type="success">查看阅读状态</el-button>
+          <el-button
+            size="mini"
+            v-if="isAdmin"
+            @click="handleStatus(scope.$index, scope.row)"
+            type="success"
+          >查看阅读状态</el-button>
           <el-button
             v-if="isAdmin"
             size="mini"
@@ -21,14 +26,26 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog title="消息内容" :visible.sync="dialogVisible" width="80%" :close-on-click-modal="isAdmin" :show-close="isAdmin">
+    <el-dialog
+      title="消息内容"
+      :visible.sync="dialogVisible"
+      width="80%"
+      :close-on-click-modal="isAdmin"
+      :show-close="isAdmin"
+    >
       <el-row>
         <div class="innerHtml">
           <span v-html="msgContent"></span>
         </div>
       </el-row>
       <el-divider v-if="msgAttachment.length > 0" />
-      <el-row v-for="(item,idx) in msgAttachment" v-bind:key="idx" style="margin-top: 3px; margin-left: 10%;" justify="start" type="flex">
+      <el-row
+        v-for="(item,idx) in msgAttachment"
+        v-bind:key="idx"
+        style="margin-top: 3px; margin-left: 10%;"
+        justify="start"
+        type="flex"
+      >
         <el-link type="primary" @click="downloadAttachment(item)">附件下载: {{item}}</el-link>
       </el-row>
       <span slot="footer" class="dialog-footer">
@@ -90,19 +107,24 @@
 import List from "./UneditableList";
 import ResChecker from "../api/common";
 
-const MSG_STATUS_ARR = [{
-    'label': '未读',
-    'type': ''
-},{
-    'label': '已读',
-    'type': 'info'
-},{
-    'label': '已接受',
-    'type': 'success'
-},{
-    'label': '已拒绝',
-    'type': 'danger'
-}];
+const MSG_STATUS_ARR = [
+  {
+    label: "未读",
+    type: ""
+  },
+  {
+    label: "已读",
+    type: "info"
+  },
+  {
+    label: "已接受",
+    type: "success"
+  },
+  {
+    label: "已拒绝",
+    type: "danger"
+  }
+];
 
 export default {
   mixins: [ResChecker],
@@ -148,42 +170,80 @@ export default {
     this.getNotify();
     let fakeData = {
       seq: 0,
-      username: 'test',
-      name: 'real_name',
+      username: "test",
+      name: "real_name",
       status: {
-        type: 'success',
-        label: 'read'
+        type: "success",
+        label: "read"
       }
-    }
-    this.msgDetailModel.tableData.push(fakeData)
+    };
+    this.msgDetailModel.tableData.push(fakeData);
   },
   components: { List },
   methods: {
     changeStatus(status) {
-      this.$http.post('changeNotificationStatus', {id: this.msgId, status: status}).then(res => {
-        this.resChecker(res.body, ()=>{
-          this.dialogVisible = false;
-          this.tableData.forEach(e => {
-            if(e.id === this.msgId) {
-              e.status = MSG_STATUS_ARR[status];
-            }
-          })
+      this.$http
+        .post("changeNotificationStatus", { id: this.msgId, status: status })
+        .then(res => {
+          this.resChecker(res.body, () => {
+            this.dialogVisible = false;
+            this.tableData.forEach(e => {
+              if (e.id === this.msgId) {
+                e.status = MSG_STATUS_ARR[status];
+              }
+            });
+          });
         });
-      });
     },
     downloadAttachment(fname) {
-      console.log(fname);
+      this.$http
+        .post(
+          this.isAdmin ? "downloadAttachmentAdmin" : "downloadAttachmentUser",
+          { id: this.msgId, filename: fname },
+          { responseType: "blob" }
+        )
+        .then(response => {
+          if (response.body.status !== undefined) {
+            if (response.body.status !== 0) {
+              swal({
+                title: "出错了",
+                text: response.body.message,
+                icon: "error",
+                button: "确定"
+              }).then(val => {
+                if (response.body.status === -1) {
+                  that.$router.push("/");
+                }
+              });
+              return;
+            }
+          }
+          const link = document.createElement("a");
+          let blob = new Blob([response.data], {
+            type: "application/octet-stream"
+          });
+          link.style.display = "none";
+          link.href = URL.createObjectURL(blob);
+          link.setAttribute("download", fname);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        })
+        .catch(res => console.log(res));
     },
     getNotify() {
-      this.$http.post(this.isAdmin ? 'getNotifications' : 'getPersonalNotifications').then(response => {
-        let res = JSON.parse(response.bodyText);
-        this.resChecker(res, ()=>{
-          res.data.forEach(e => {
-            e.date = new Date(e.date).toLocaleString();
+      this.$http
+        .post(this.isAdmin ? "getNotifications" : "getPersonalNotifications")
+        .then(response => {
+          let res = JSON.parse(response.bodyText);
+          this.resChecker(res, () => {
+            res.data.forEach(e => {
+              e.date = new Date(e.date).toLocaleString();
+            });
+            this.tableData = res.data;
           });
-          this.tableData = res.data;
-        });
-      }).catch(res=>console.log(res))
+        })
+        .catch(res => console.log(res));
     },
     handleDetails(idx, row) {
       if (
@@ -196,27 +256,38 @@ export default {
         this.msgContent = "";
         this.msgAttachment = [];
         this.msgId = 0;
-        this.$http.post(this.isAdmin ? 'getNotificationDetailAdmin' : 'getNotificationDetail', { id : row.id }).then(response => {
-          this.resChecker(response.body, ()=>{
-            this.msgContent = response.body.data.content;
-            if(response.body.data.attachment_arr.length > 0)
-              this.msgAttachment = response.body.data.attachment_arr;
-            this.msgId = row.id;
-          });
-        }).catch(res=>console.log(res))
+        this.$http
+          .post(
+            this.isAdmin
+              ? "getNotificationDetailAdmin"
+              : "getNotificationDetail",
+            { id: row.id }
+          )
+          .then(response => {
+            this.resChecker(response.body, () => {
+              this.msgContent = response.body.data.content;
+              if (response.body.data.attachment_arr.length > 0)
+                this.msgAttachment = response.body.data.attachment_arr;
+              this.msgId = row.id;
+            });
+          })
+          .catch(res => console.log(res));
       }
     },
     handlePageChange(val) {
-      this.$http.post('getNotificationStatus', {id: this.msgId, page: val}).then(res=>{
-        this.resChecker(res.body, ()=>{
-          this.numPages = res.body.data.page_cnt;
-          this.msgDetailModel.tableData = res.body.data.curr_entries;
+      this.$http
+        .post("getNotificationStatus", { id: this.msgId, page: val })
+        .then(res => {
+          this.resChecker(res.body, () => {
+            this.numPages = res.body.data.page_cnt;
+            this.msgDetailModel.tableData = res.body.data.curr_entries;
+          });
         })
-      }).catch(res=>console.log(res));
+        .catch(res => console.log(res));
     },
     handleStatus(idx, row) {
       // fetch and set data
-      this.msgDetailModel.tableData = []
+      this.msgDetailModel.tableData = [];
       this.msgId = row.id;
       this.handlePageChange(1);
       this.dialogAdminVisible = true;
@@ -229,10 +300,10 @@ export default {
         })
         .then(response => {
           let res = JSON.parse(response.bodyText);
-          this.resChecker(res, ()=>{
+          this.resChecker(res, () => {
             that.tableData.splice(idx, 1);
             swal({ title: "删除成功", icon: "success", button: "确定" });
-          })
+          });
         })
         .catch(function(response) {
           console.log(response);

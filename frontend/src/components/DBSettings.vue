@@ -192,6 +192,8 @@ export default {
                 icon: "success",
                 button: "确定"
               }).then(val => {
+                if(that.curDatabase === row.pk)
+                  that.curDatabase = "";
                 that.tableData.splice(idx, 1);
               });
             });
