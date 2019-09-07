@@ -77,24 +77,13 @@
 <script>
 /* eslint-disable */
 import List from "./UneditableList";
+import ResChecker from "../api/common";
 
 export default {
+  mixins: [ResChecker],
   data() {
     return {
-      tableData: [
-        {
-          title: "test",
-          date: "test",
-          status: { label: "read", type: "success" },
-          link: "test"
-        },
-        {
-          title: "test",
-          date: "test",
-          status: { label: "reject", type: "danger" },
-          link: "test"
-        }
-      ],
+      tableData: [],
       dialogVisible: false,
       dialogAdminVisible: false,
       msgContent: "",
@@ -144,7 +133,15 @@ export default {
   components: { List },
   methods: {
     getNotify() {
-      console.log("Get notify");
+      this.$http.post(this.isAdmin ? 'getNotifications' : 'getPersonalNotifications').then(response => {
+        let res = JSON.parse(response.bodyText);
+        this.resChecker(res, ()=>{
+          res.data.forEach(e => {
+            e.date = new Date(e.date).toLocaleString();
+          });
+          this.tableData = res.data;
+        });
+      }).catch(res=>console.log(res))
     },
     handleDetails(idx, row) {
       if (
@@ -162,34 +159,21 @@ export default {
     },
     handleStatus(idx, row) {
       // fetch and set data
+      this.msgDetailModel.tableData = []
       this.dialogAdminVisible = true;
     },
     handleDel(idx, row) {
       let that = this;
       this.$http
-        .post("delNotify", {
-          token: window.sessionStorage.token,
-          username: window.sessionStorage.username,
+        .post("delNotification", {
           data: { id: row.id, title: row.title }
         })
         .then(response => {
           let res = JSON.parse(response.bodyText);
-          if (res.status === 0) {
+          this.resChecker(res, ()=>{
             that.tableData.splice(idx, 1);
             swal({ title: "删除成功", icon: "success", button: "确定" });
-          } else {
-            let that = this;
-            swal({
-              title: "出错了",
-              text: res.message,
-              icon: "error",
-              button: "确定"
-            }).then(val => {
-              if (res.status === -1) {
-                that.$router.push("/");
-              }
-            });
-          }
+          })
         })
         .catch(function(response) {
           console.log(response);

@@ -40,8 +40,9 @@ urlpatterns = [
     path('getCurrentSystemTitle', views.getCurrentSystemTitle),
     path('getNotifications', views.getNotifications),
     path('getNotificationStatus', views.getNotificationStatus),
-    path('sendNotificationUpload', views.sendNotificationUpload),
+    path('getPersonalNotifications', views.getPersonalNotifications),
+    path('sendNotification', views.sendNotification),
+    path('delNotification', views.delNotification),
     path('changeUsersGroupByExcel', views.changeUsersGroupByExcel),
     path('changeNotificationStatus', views.changeNotificationStatus),
-    path('getPersonalNotifications', views.getPersonalNotifications)
 ]

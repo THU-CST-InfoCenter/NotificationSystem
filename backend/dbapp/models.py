@@ -21,7 +21,7 @@ class AdminUser(models.Model):
     username = models.CharField(max_length=100, db_index=True, unique=True)
     name = models.CharField(max_length=100)
     password = models.CharField(max_length=50)
-    email = models.EmailField()
+    email = models.EmailField(null=True, default=None)
     create_time = models.DateTimeField(auto_now_add=True)
     token = models.CharField(max_length=64, db_index=True)
     token_set_time = models.DateTimeField(auto_now_add=True)

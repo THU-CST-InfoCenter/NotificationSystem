@@ -1,7 +1,7 @@
 <template>
   <div>
     <el-row type="flex" justify="start" align="start">
-      <el-col :span="16">
+      <el-col :span="8" justify="start" align="start">
         <el-upload
           ref="upload"
           action
@@ -15,7 +15,7 @@
         >
         <el-button slot="trigger" type="primary">从Excel导入用户</el-button>
         <el-button style="margin-left: 20px;" type="success" @click="onSubmitDocument">上传</el-button>
-        <div slot="tip" class="el-upload__tip">只能上传Excel文件</div>
+        <div slot="tip" class="el-upload__tip">只能上传Excel文件, 大小不能超过10M</div>
         </el-upload>
       </el-col>
     </el-row>
@@ -75,6 +75,7 @@ export default {
         ],
         tableData: []
       },
+      fileList: [],
       linkCb: function(link) {
         console.log(link)
       },
@@ -103,6 +104,21 @@ export default {
     },
     addUserFromExcel() {
       console.log('add_user')
+    },
+    handleChange(file, fileList) {
+      let name = file.name.split(".");
+      name = name[name.length - 1];
+      const ext = name === "xls" || name === "XLS" || name === "xlsx" || name === "XLSX";
+      const size = file.size < 10 * 1024 * 1024;
+      if (!ext) {
+        swal({ title: "错误", text: "文件必须为EXCEL", icon: "error" });
+        this.$refs.upload.uploadFiles = [];
+      } else if (!size) {
+        swal({ title: "错误", text: "文件大小不能超过10M", icon: "error" });
+        this.$refs.upload.uploadFiles = [];
+      } else {
+        this.$refs.upload.uploadFiles = [file];
+      }
     },
     myUpload(content) {
       let that = this;

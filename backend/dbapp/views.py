@@ -5,7 +5,9 @@ from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connections
 from django.core.paginator import Paginator
+from django.db.models import Q
 from dbapp import models
+import pathlib
 import requests
 import xlrd
 import urllib
@@ -20,6 +22,19 @@ import hashlib
 import os
 sys.path.append('../')
 
+MSG_STATUS_ARR = [{
+    'label': '未读',
+    'type': ''
+},{
+    'label': '已读',
+    'type': 'info'
+},{
+    'label': '已接受',
+    'type': 'success'
+},{
+    'label': '已拒绝',
+    'type': 'danger'
+}]
 
 def createToken(user):
     # update token if already exists
@@ -232,8 +247,6 @@ def createStudentAccounts(req, **kwargs):
             username_col = int(req.POST.get('username_col'))
             name_col = int(req.POST.get('name_col'))
             pwd_col = int(req.POST.get('pwd_col'))
-            db_settings_id = db.id
-            print(db_settings_id)
             f = req.FILES.get('file')
             f.seek(0)
             #print("Load Files",name_col,pwd_col)
@@ -252,14 +265,206 @@ def createStudentAccounts(req, **kwargs):
                 stu_info = {'username': stu_username,
                     'name': stu_name,
                     'password': stu_pwd,
-                    'email': 'null',
-                    'db_settings_id': db_settings_id}
+                    'db_settings': db}
                 models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
             result['status'] = 0
             result['newusers'] = rownum-1
     except Exception as e:
         print(e)
         result['message'] = '服务器内部错误'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def changeUsersGroupByExcel(req, **kwargs):
+    try:
+        result = {'status': 1}        
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            username_col = int(req.POST.get('username_col'))
+            group_id = int(req.POST.get('group_id'))
+            f = req.FILES.get('file')
+            f.seek(0)
+            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
+            sheet0 = stuinfo.sheet_by_index(0)
+            rownum = sheet0.nrows
+            #print(sheet0.cell_value(0,0),rownum)
+            for i in range(1,rownum):
+                stu_username = str(sheet0.cell_value(i,username_col))
+                models.User.objects.filter(username=stu_username,db_settings = db).update(group=group_id)
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '服务器内部错误'
+
+@csrf_exempt
+@check_post
+@check_admin
+def getNotificationStatus(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            notification_id = int(req.POST.get('notification_id'))
+            notification = models.Notification.objects.get(id=notification_id, db_settings=db)
+            result['data'] = []
+            res = models.NotificationStatus.objects.filter(notification=notification)
+            for item in res:
+                result['data'].append({'username': item.user.username, 'name': item.user.name, 'status': item.status })
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '服务器内部错误'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getNotifications(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            notify = []
+            notifies = models.Notification.objects.filter(db_settings = db).order_by("-time")
+            for entry in notifies:
+                notify.append({
+                    'title': entry.title,
+                    'date': entry.time,
+                    'link': entry.id,
+                    'id': entry.id
+                })
+            result['data'] = notify
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '服务器内部错误'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def delNotification(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)['data']
+            try:
+                model = models.Notification.objects.get(db_settings=db,id=data['id'], title=data['title'])
+                file_arr = json.loads(model.attachment_arr)
+                for f in file_arr:
+                    try:
+                        os.remove(os.path.join(data_dir, f))
+                    except:
+                        pass
+                model.delete()
+            except:
+                pass
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '服务器内部错误'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_login
+def getPersonalNotifications(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            user = kwargs['__user']
+            ## visible to the group the user is in / visible to all (Group is None)
+            notify = []
+            notifies = models.Notification.objects.filter(Q(visible_group=user.group)|Q(visible_group=None), db_settings=db).order_by("-time")
+            for entry in notifies:
+                stat, _ = models.NotificationStatus.objects.get_or_create(
+                    user=user, notification=entry, defaults={'user': user, 'notification': entry, 'status': 0})
+                notify.append({
+                    'title': entry.title,
+                    'date': entry.time,
+                    'link': entry.id,
+                    'status': MSG_STATUS_ARR[stat.status]
+                })
+            result['data'] = notify
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def sendNotification(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            f = req.FILES.get('file')
+            title = req.POST.get('title')
+            content = req.POST.get('content')
+            visible_group_id_str = req.POST.get('visible_group_id')
+            visible_group = None
+            if(visible_group_id_str != ''):
+                visible_group = models.Group.objects.get(id=int(visible_group_id_str))
+            attachments = []
+            if f is not None:
+                f.seek(0)
+                attachments.append(f.name)
+                pathlib.Path(data_dir).mkdir(parents=True, exist_ok=True) 
+                fdir = os.path.join(data_dir, f.name)
+                with open(fdir, 'wb+') as destination:
+                    for chunk in f.chunks():
+                        destination.write(chunk)
+            notification = models.Notification.objects.create(
+                title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group)
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_login
+def changeNotificationStatus(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            user = kwargs['__user']
+            notification_id = int(req.POST.get('notification_id'))
+            status = int(req.POST.get('status'))
+            notification = models.Notification.objects.get(id=notification_id)
+            models.NotificationStatus.objects.update_or_create(user=user,defaults={'user':user, 'notification': notification, 'status':status})
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
     finally:
         return JsonResponse(result)
 
@@ -279,33 +484,6 @@ def getDBList(req, **kwargs):
     finally:
         return JsonResponse(result)
 
-@csrf_exempt
-@check_post
-@check_admin
-def changeUsersGroupByExcel(req, **kwargs):
-    try:
-        result = {'status': 1}        
-        db = getCurrentDB()
-        if(db is None):
-            raise Exception("No db is selected now")
-        else:
-            db_settings_id = db.id
-            username_col = int(req.POST.get('username_col'))
-            group_id = int(req.POST.get('group_id'))
-            f = req.FILES.get('file')
-            f.seek(0)
-            stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
-            sheet0 = stuinfo.sheet_by_index(0)
-            rownum = sheet0.nrows
-            #print(sheet0.cell_value(0,0),rownum)
-            for i in range(1,rownum):
-                stu_username = str(sheet0.cell_value(i,username_col))
-                models.User.objects.filter(username=stu_username,db_settings = db_settings_id).update(group=group_id)
-            result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '服务器内部错误'
-
 def getDB(req, **kwargs):
     result = {'status': 1}
     try:
@@ -316,29 +494,7 @@ def getDB(req, **kwargs):
         print(e)
         result['message'] = '操作失败'
     finally:
-        return JsonResponse(result)
-
-@csrf_exempt
-@check_post
-@check_admin
-def getNotifications(req, **kwargs):
-    try:
-        result = {'status': 1}
-        group_id = int(req.POST.get('group_id'))
-        db = getCurrentDB()
-        if(db is None):
-            raise Exception("No db is selected now")
-        else:
-            db_settings_id = db.id
-            result['data'] = serializers.serialize(
-                'json', models.Notification.objects.filter(group = group_id, db_settings = db_settings_id))
-            result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '服务器内部错误'
-    finally:
-        return JsonResponse(result)
-        
+        return JsonResponse(result)        
 
 @csrf_exempt
 @check_post
@@ -374,22 +530,6 @@ def delDB(req, **kwargs):
     except Exception as e:
         print(e)
         result['message'] = '操作失败'
-    finally:
-        return JsonResponse(result)
-
-@csrf_exempt
-@check_post
-@check_admin
-def getNotificationStatus(req, **kwargs):
-    try:
-        result = {'status': 1}
-        notification_id = int(req.POST.get('notification_id'))
-        result['data'] = serializers.serialize(
-            'json', models.NotificationStatus.objects.filter(notification_id = notification_id))
-        result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '服务器内部错误'
     finally:
         return JsonResponse(result)
 
@@ -560,74 +700,5 @@ def editGroup(req, **kwargs):
     except Exception as e:
         print(e)
         result['message'] = '操作失败'
-    finally:
-        return JsonResponse(result)
-
-@csrf_exempt
-@check_post
-@check_admin
-def sendNotificationUpload(req, **kwargs):
-    try:
-        result = {'status': 1}
-        db = getCurrentDB()
-        if(db is None):
-            raise Exception("No db is selected now")
-        else:
-            f = req.FILES.get('file')
-            title = req.POST.get('title')
-            content = req.POST.get('content')
-            db_settings_id = db.id
-            visible_group_id = int(req.POST.get('visible_group_id'))
-            f.seek(0)
-            fdir = os.path.join(data_dir,f.name)
-            with open(fdir, 'wb+') as destination:
-                for chunk in f.chunks():
-                    destination.write(chunk)
-            notification = models.Notification.objects.create(
-                title=title, content=content, attachment_arr=fdir, db_settings_id=db_settings_id, visible_group_id=visible_group_id)
-            if visible_group_id == -1:
-                users = list(models.User.objects.filter(db_settings_id = db_settings_id))
-            else:
-                users = models.User.objects.filter(db_settings_id = db_settings_id,group_id = visible_group_id)
-            for user in users:
-                models.NotificationStatus.objects.create(
-                    status=0, notification_id=notification.id, user_id = user.id)
-            result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '请求无效'
-    finally:
-        return JsonResponse(result)
-
-@csrf_exempt
-@check_post
-@check_admin
-def changeNotificationStatus(req, **kwargs):
-    try:
-        result = {'status': 1}
-        user_id = kwargs['__user'].id
-        notification_id = int(req.POST.get('notification_id'))
-        status = int(req.POST.get('status'))
-        models.NotificationStatus.objects.get(notification_id=notification_id, user_id=user_id).update(status=status)
-        result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '请求无效'
-    finally:
-        return JsonResponse(result)
-
-@csrf_exempt
-@check_post
-@check_admin
-def getPersonalNotifications(req, **kwargs):
-    try:
-        result = {'status': 1}
-        user_id = kwargs['__user'].id
-        result['data'] = serializers.serialize(
-            'json', models.Notification.objects.filter(user_id=user_id).order_by("-time"))
-        result['status'] = 0
-    except Exception as e:
-        print(e)
-        result['message'] = '请求无效'
     finally:
         return JsonResponse(result)
