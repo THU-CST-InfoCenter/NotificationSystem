@@ -98,7 +98,10 @@ def check_login(f):
         try:
             header_username = req.META['HTTP_X_ACCESS_USERNAME']
             header_token = req.META['HTTP_X_ACCESS_TOKEN']
-            user = models.User.objects.get(username=header_username)
+            db_settings = getCurrentDB()
+            if(db_settings is None):
+                raise Exception("System is not properly configured")
+            user = models.User.objects.get(username=header_username, db_settings=db_settings)
             token = getToken(user, token_exp_time)
             if(token == header_token):
                 updateToken(user)
@@ -165,7 +168,10 @@ def userLogin(req):
     result = {'status': 1}
     try:
         data = json.loads(req.body)
-        user = models.User.objects.get(username=data['username'])
+        db_settings = getCurrentDB()
+        if(db_settings is None):
+            raise Exception("System is not properly configured")
+        user = models.User.objects.get(username=data['username'], db_settings=db_settings)
         if(user.password != data['password']):
             result['message'] = '用户名或密码错误'
             models.LogAction('login_failure', user,
