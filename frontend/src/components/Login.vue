@@ -35,6 +35,9 @@
   height: 100vh;
   width: 100vw;
   background-image: url('~@/assets/bg.jpeg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
   .card {
     background-color: rgba($color: #fff, $alpha: 0.5) !important;
   }
