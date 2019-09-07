@@ -208,7 +208,7 @@ export default {
       this.dialogFormVisible = true;
     },
     changePasswordSubmit() {
-      console.log("changePasswordSubmit")
+      this.$refs.perinfo.onSubmit();
     }
   },
   components: { ChangePwd }

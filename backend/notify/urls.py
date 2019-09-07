@@ -18,7 +18,9 @@ from dbapp import views
 
 urlpatterns = [
     path('userLogin', views.userLogin),
+    path('userChangePassword', views.userChangePassword),
     path('adminLogin', views.adminLogin),
+    path('adminChangePassword', views.adminChangePassword),
     path('createStudentAccounts', views.createStudentAccounts),
     ## for debug purpose
     path('debugCheckers', views.debugCheckers),
@@ -38,11 +40,18 @@ urlpatterns = [
     path('editGroup', views.editGroup),
     path('getCurrentDBId', views.getCurrentDBId),
     path('getCurrentSystemTitle', views.getCurrentSystemTitle),
+    ## Notification mgmt
     path('getNotifications', views.getNotifications),
     path('getNotificationStatus', views.getNotificationStatus),
     path('getPersonalNotifications', views.getPersonalNotifications),
+    path('getNotificationDetail', views.getNotificationDetail),
+    path('getNotificationDetailAdmin', views.getNotificationDetailAdmin),
     path('sendNotification', views.sendNotification),
     path('delNotification', views.delNotification),
-    path('changeUsersGroupByExcel', views.changeUsersGroupByExcel),
     path('changeNotificationStatus', views.changeNotificationStatus),
+    ## User mgmt
+    path('changeUsersGroupByExcel', views.changeUsersGroupByExcel),
+    path('getUserList', views.getUserList),
+    path('getUserInfo', views.getUserInfo),
+    path('changeUserInfoAdmin', views.changeUserInfoAdmin)
 ]

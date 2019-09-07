@@ -23,7 +23,7 @@
               <el-checkbox v-model="isAdmin">管理员登录</el-checkbox>
             </el-form-item>
             <el-form-item>
-              <el-button class="btn" type="primary" @click="onSubmit('login')">登陆</el-button>
+              <el-button class="btn" type="primary" @click="onSubmit('login')">登录</el-button>
               <el-button class="btn" type="danger" @click="clearFrm()">清除</el-button>
             </el-form-item>
           </el-form>

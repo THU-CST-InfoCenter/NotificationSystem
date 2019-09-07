@@ -21,13 +21,24 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog title="消息内容" :visible.sync="dialogVisible" width="80%">
-      <div class="innerHtml">
-        <span v-html="msgContent"></span>
-      </div>
+    <el-dialog title="消息内容" :visible.sync="dialogVisible" width="80%" :close-on-click-modal="isAdmin" :show-close="isAdmin">
+      <el-row>
+        <div class="innerHtml">
+          <span v-html="msgContent"></span>
+        </div>
+      </el-row>
+      <el-divider v-if="msgAttachment.length > 0" />
+      <el-row v-for="(item,idx) in msgAttachment" v-bind:key="idx" style="margin-top: 3px; margin-left: 10%;" justify="start" type="flex">
+        <el-link type="primary" @click="downloadAttachment(item)">附件下载: {{item}}</el-link>
+      </el-row>
       <span slot="footer" class="dialog-footer">
-        <!--el-button @click="dialogVisible = false">取 消</el-button-->
-        <el-button type="primary" @click="dialogVisible = false">确 定</el-button>
+        <el-button v-if="isAdmin" type="primary" @click="dialogVisible = false">确 定</el-button>
+        <div v-if="!isAdmin">
+          <el-button @click="dialogVisible = false">取 消</el-button>
+          <el-button type="primary" @click="changeStatus(1)">确认已读</el-button>
+          <el-button type="success" @click="changeStatus(2)">接受</el-button>
+          <el-button type="danger" @click="changeStatus(3)">拒绝</el-button>
+        </div>
       </span>
     </el-dialog>
     <el-dialog title="消息状态" :visible.sync="dialogAdminVisible" width="80%" v-if="isAdmin">
@@ -79,6 +90,20 @@
 import List from "./UneditableList";
 import ResChecker from "../api/common";
 
+const MSG_STATUS_ARR = [{
+    'label': '未读',
+    'type': ''
+},{
+    'label': '已读',
+    'type': 'info'
+},{
+    'label': '已接受',
+    'type': 'success'
+},{
+    'label': '已拒绝',
+    'type': 'danger'
+}];
+
 export default {
   mixins: [ResChecker],
   data() {
@@ -87,6 +112,8 @@ export default {
       dialogVisible: false,
       dialogAdminVisible: false,
       msgContent: "",
+      msgId: 0,
+      msgAttachment: [],
       isAdmin: window.sessionStorage.isAdmin == 1,
       msgDetailModel: {
         tableColumn: [
@@ -132,6 +159,21 @@ export default {
   },
   components: { List },
   methods: {
+    changeStatus(status) {
+      this.$http.post('changeNotificationStatus', {id: this.msgId, status: status}).then(res => {
+        this.resChecker(res.body, ()=>{
+          this.dialogVisible = false;
+          this.tableData.forEach(e => {
+            if(e.id === this.msgId) {
+              e.status = MSG_STATUS_ARR[status];
+            }
+          })
+        });
+      });
+    },
+    downloadAttachment(fname) {
+      console.log(fname);
+    },
     getNotify() {
       this.$http.post(this.isAdmin ? 'getNotifications' : 'getPersonalNotifications').then(response => {
         let res = JSON.parse(response.bodyText);
@@ -150,16 +192,33 @@ export default {
         this.tableData[idx] != null &&
         this.tableData[idx].link != null
       ) {
-        this.msgContent = this.tableData[idx].link;
         this.dialogVisible = true;
+        this.msgContent = "";
+        this.msgAttachment = [];
+        this.msgId = 0;
+        this.$http.post(this.isAdmin ? 'getNotificationDetailAdmin' : 'getNotificationDetail', { id : row.id }).then(response => {
+          this.resChecker(response.body, ()=>{
+            this.msgContent = response.body.data.content;
+            if(response.body.data.attachment_arr.length > 0)
+              this.msgAttachment = response.body.data.attachment_arr;
+            this.msgId = row.id;
+          });
+        }).catch(res=>console.log(res))
       }
     },
     handlePageChange(val) {
-      console.log(val)
+      this.$http.post('getNotificationStatus', {id: this.msgId, page: val}).then(res=>{
+        this.resChecker(res.body, ()=>{
+          this.numPages = res.body.data.page_cnt;
+          this.msgDetailModel.tableData = res.body.data.curr_entries;
+        })
+      }).catch(res=>console.log(res));
     },
     handleStatus(idx, row) {
       // fetch and set data
       this.msgDetailModel.tableData = []
+      this.msgId = row.id;
+      this.handlePageChange(1);
       this.dialogAdminVisible = true;
     },
     handleDel(idx, row) {

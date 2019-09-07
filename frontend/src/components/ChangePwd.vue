@@ -41,7 +41,7 @@
 <script>
 /* eslint-disable */
 let md5 = require("js-md5");
-import ResChecker from '../api/common'
+import ResChecker from "../api/common";
 
 export default {
   created() {},
@@ -54,22 +54,33 @@ export default {
   },
   methods: {
     onSubmit() {
-      var password = {
-        old_pwd: md5(this.perinfo.old_pwd),
-        new_pwd: md5(this.perinfo.new_pwd),
-        isAdmin: false
-      };
-      this.$http
-        .post(isAdmin ? "changePasswordAdmin" : "changePassword", {
-          data: password
-        })
-        .then(response => {
-          let res = JSON.parse(response.bodyText);
-          this.resChecker(res, ()=>swal({title:"修改成功",icon:"success",button:"确定"}).then(val => this.$router.go(0)));
-        })
-        .catch(function(response) {
-          console.log(response);
-        });
+      this.$refs.form.validate(v => {
+        if (v) {
+          let isAdmin = window.sessionStorage.isAdmin == 1;
+          var password = {
+            old_pwd: md5(this.perinfo.old_pwd),
+            new_pwd: md5(this.perinfo.new_pwd)
+          };
+          this.$http
+            .post(
+              isAdmin ? "adminChangePassword" : "userChangePassword",
+              password
+            )
+            .then(response => {
+              let res = JSON.parse(response.bodyText);
+              this.resChecker(res, () =>
+                swal({
+                  title: "修改成功",
+                  icon: "success",
+                  button: "确定"
+                }).then(val => this.$router.go(0))
+              );
+            })
+            .catch(function(response) {
+              console.log(response);
+            });
+        }
+      });
     }
   },
   data() {

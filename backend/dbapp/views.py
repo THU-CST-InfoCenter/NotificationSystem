@@ -179,6 +179,45 @@ def debugCheckers(req, *arg, **kwargs):
 
 @csrf_exempt
 @check_post
+@check_admin
+def adminChangePassword(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        user = kwargs['__admin_user']
+        if(data['old_pwd'] == user.password):
+            user.password = data['new_pwd']
+            user.save(force_update=True)
+            result['status'] = 0
+        else:
+            raise Exception('Invalid password found when trying to modify pwd')
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_login
+def userChangePassword(req, **kwargs):
+    result = {'status': 1}
+    try:
+        data = json.loads(req.body)
+        user = kwargs['__user']
+        if(data['old_pwd'] == user.password):
+            user.password = data['new_pwd']
+            user.save(force_update=True)
+            result['status'] = 0
+        else:
+            raise Exception('Invalid password found when trying to modify pwd')
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    return JsonResponse(result)
+
+
+@csrf_exempt
+@check_post
 def userLogin(req):
     result = {'status': 1}
     try:
@@ -247,17 +286,17 @@ def createStudentAccounts(req, **kwargs):
             username_col = int(req.POST.get('username_col'))
             name_col = int(req.POST.get('name_col'))
             pwd_col = int(req.POST.get('pwd_col'))
+            start_row = int(req.POST.get('start_row'))
+            end_row = int(req.POST.get('end_row'))
             f = req.FILES.get('file')
             f.seek(0)
-            #print("Load Files",name_col,pwd_col)
+            #print("Load Files",name_col,pwd_col,username_col)
             # tempFilePath = f.temporary_file_path()
             stuinfo = xlrd.open_workbook(filename=None, file_contents=f.read())
             sheet0 = stuinfo.sheet_by_index(0)
             rownum = sheet0.nrows
             #print(sheet0.cell_value(0,0),rownum)
-            for i in range(1,rownum):
-                if i > 10:
-                    break
+            for i in range(start_row, min(rownum, end_row + 1)):
                 stu_name = str(sheet0.cell_value(i,name_col))
                 stu_username = str(sheet0.cell_value(i,username_col))
                 stu_pwd = str(sheet0.cell_value(i,pwd_col))
@@ -268,10 +307,10 @@ def createStudentAccounts(req, **kwargs):
                     'db_settings': db}
                 models.User.objects.update_or_create(username=stu_username, defaults=stu_info)
             result['status'] = 0
-            result['newusers'] = rownum-1
+            result['newusers'] = min(rownum, end_row + 1) - start_row
     except Exception as e:
         print(e)
-        result['message'] = '服务器内部错误'
+        result['message'] = '操作失败'
     finally:
         return JsonResponse(result)
 
@@ -299,7 +338,7 @@ def changeUsersGroupByExcel(req, **kwargs):
             result['status'] = 0
     except Exception as e:
         print(e)
-        result['message'] = '服务器内部错误'
+        result['message'] = '操作失败'
 
 @csrf_exempt
 @check_post
@@ -311,16 +350,21 @@ def getNotificationStatus(req, **kwargs):
         if(db is None):
             raise Exception("No db is selected now")
         else:
-            notification_id = int(req.POST.get('notification_id'))
+            data = json.loads(req.body)
+            notification_id = int(data['id'])
             notification = models.Notification.objects.get(id=notification_id, db_settings=db)
             result['data'] = []
-            res = models.NotificationStatus.objects.filter(notification=notification)
-            for item in res:
-                result['data'].append({'username': item.user.username, 'name': item.user.name, 'status': item.status })
+            pages = Paginator(models.NotificationStatus.objects.filter(notification=notification).order_by("-status"), 15)
+            page = pages.page(data['page'])
+            result['data'] = { 'page_cnt': pages.num_pages, 'count': pages.count, 'curr_entries': [] }
+            seq = (data['page'] - 1) * 15
+            for item in page.object_list:
+                result['data']['curr_entries'].append({'seq': seq, 'username': item.user.username, 'name': item.user.name, 'status': MSG_STATUS_ARR[item.status] })
+                seq += 1
             result['status'] = 0
     except Exception as e:
         print(e)
-        result['message'] = '服务器内部错误'
+        result['message'] = '操作失败'
     finally:
         return JsonResponse(result)
 
@@ -347,7 +391,7 @@ def getNotifications(req, **kwargs):
             result['status'] = 0
     except Exception as e:
         print(e)
-        result['message'] = '服务器内部错误'
+        result['message'] = '操作失败'
     finally:
         return JsonResponse(result)
 
@@ -376,7 +420,7 @@ def delNotification(req, **kwargs):
             result['status'] = 0
     except Exception as e:
         print(e)
-        result['message'] = '服务器内部错误'
+        result['message'] = '操作失败'
     finally:
         return JsonResponse(result)
 
@@ -401,7 +445,8 @@ def getPersonalNotifications(req, **kwargs):
                     'title': entry.title,
                     'date': entry.time,
                     'link': entry.id,
-                    'status': MSG_STATUS_ARR[stat.status]
+                    'status': MSG_STATUS_ARR[stat.status],
+                    'id': entry.id
                 })
             result['data'] = notify
             result['status'] = 0
@@ -439,6 +484,64 @@ def sendNotification(req, **kwargs):
                         destination.write(chunk)
             notification = models.Notification.objects.create(
                 title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group)
+            users = models.User.objects.filter(group=visible_group, db_settings=db)
+            for user in users:
+                models.NotificationStatus.objects.update_or_create(notification=notification, user=user, defaults={
+                    'notification': notification,
+                    'user': user,
+                    'status': 0
+                })
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_login
+def getNotificationDetail(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            user = kwargs['__user']
+            data = json.loads(req.body)
+            notification_id = int(data['id'])
+            notification = models.Notification.objects.get(Q(visible_group=user.group)|Q(visible_group=None), id=notification_id, db_settings=db)
+            result['data'] = {
+                'title': notification.title,
+                'content': notification.content,
+                'attachment_arr': json.loads(notification.attachment_arr)
+            }
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '请求无效'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getNotificationDetailAdmin(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)
+            notification_id = int(data['id'])
+            notification = models.Notification.objects.get(id=notification_id, db_settings=db)
+            result['data'] = {
+                'title': notification.title,
+                'content': notification.content,
+                'attachment_arr': json.loads(notification.attachment_arr)
+            }
             result['status'] = 0
     except Exception as e:
         print(e)
@@ -457,10 +560,11 @@ def changeNotificationStatus(req, **kwargs):
             raise Exception("No db is selected now")
         else:
             user = kwargs['__user']
-            notification_id = int(req.POST.get('notification_id'))
-            status = int(req.POST.get('status'))
-            notification = models.Notification.objects.get(id=notification_id)
-            models.NotificationStatus.objects.update_or_create(user=user,defaults={'user':user, 'notification': notification, 'status':status})
+            data = json.loads(req.body)
+            notification_id = int(data['id'])
+            status = int(data['status'])
+            notification = models.Notification.objects.get(Q(visible_group=user.group)|Q(visible_group=None), id=notification_id, db_settings=db)
+            models.NotificationStatus.objects.update_or_create(user=user, notification=notification, defaults={'user':user, 'notification': notification, 'status':status})
             result['status'] = 0
     except Exception as e:
         print(e)
@@ -696,6 +800,98 @@ def editGroup(req, **kwargs):
             model = models.Group.objects.get(id=data['pk'], db_settings=db)
             model.groupname = data['groupname']
             model.save(force_update=True)
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getUserList(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)
+            result['data'] = []
+            pages = Paginator(models.User.objects.filter(db_settings=db).order_by('id'), 15)
+            page = pages.page(data['page'])
+            result['data'] = { 'page_cnt': pages.num_pages, 'count': pages.count, 'curr_entries': [] }
+            seq = (data['page'] - 1) * 15
+            for item in page.object_list:
+                result['data']['curr_entries'].append({'seq': seq, 'username': item.username, 'name': item.name, 'link': {'link': item.id, 'label': '编辑用户'} })
+                seq += 1
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def getUserInfo(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)
+            user = models.User.objects.get(db_settings=db, id=data['id'])
+            result['data'] = {
+                'username': user.username,
+                'name': user.name,
+                'email': user.email,
+                'create_time': user.create_time,
+                'group': None if user.group is None else user.group.id,
+                'id': user.id
+            }
+            result['status'] = 0
+    except Exception as e:
+        print(e)
+        result['message'] = '操作失败'
+    finally:
+        return JsonResponse(result)
+
+@csrf_exempt
+@check_post
+@check_admin
+def changeUserInfoAdmin(req, **kwargs):
+    try:
+        result = {'status': 1}
+        db = getCurrentDB()
+        if(db is None):
+            raise Exception("No db is selected now")
+        else:
+            data = json.loads(req.body)
+            print(data)
+            user = models.User.objects.get(db_settings=db, id=data['id'])
+            user.email = data['email']
+            if(data['pwd'] is not None and data['pwd'] != ""):
+                user.password = data['pwd']
+            if(data['group'] is not None and data['group'] != ""):
+                group_id = int(data['group'])
+                group = models.Group.objects.get(id=group_id)
+                ## if user changes group, messages that are private in original group should be deleted
+                if(group != user.group):
+                    for item in models.NotificationStatus.objects.filter(user=user):
+                        if(item.notification.visible_group is not None):
+                            item.delete()
+                user.group = group
+            else:
+                if(user.group is not None):
+                    for item in models.NotificationStatus.objects.filter(user=user):
+                        if(item.notification.visible_group is not None):
+                            item.delete()
+                user.group = None
+            user.save(force_update=True)
             result['status'] = 0
     except Exception as e:
         print(e)
