@@ -478,6 +478,7 @@ def getPersonalNotifications(req, **kwargs):
                     'date': entry.time,
                     'link': entry.id,
                     'status': MSG_STATUS_ARR[stat.status],
+                    'status_id': stat.status,
                     'id': entry.id
                 })
             result['data'] = notify
@@ -502,6 +503,7 @@ def sendNotification(req, **kwargs):
             title = req.POST.get('title')
             content = req.POST.get('content')
             visible_group_id_str = req.POST.get('visible_group_id')
+            notification_type = int(req.POST.get('notification_type'))
             visible_group = None
             if(visible_group_id_str != ''):
                 visible_group = models.Group.objects.get(id=int(visible_group_id_str))
@@ -515,7 +517,7 @@ def sendNotification(req, **kwargs):
                     for chunk in f.chunks():
                         destination.write(chunk)
             notification = models.Notification.objects.create(
-                title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group)
+                title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group, notification_type=notification_type)
             if(visible_group is not None):
                 users = models.User.objects.filter(group=visible_group, db_settings=db)
             else:
@@ -550,7 +552,8 @@ def getNotificationDetail(req, **kwargs):
             result['data'] = {
                 'title': notification.title,
                 'content': notification.content,
-                'attachment_arr': json.loads(notification.attachment_arr)
+                'attachment_arr': json.loads(notification.attachment_arr),
+                'notification_type': notification.notification_type
             }
             result['status'] = 0
     except Exception as e:
@@ -575,7 +578,8 @@ def getNotificationDetailAdmin(req, **kwargs):
             result['data'] = {
                 'title': notification.title,
                 'content': notification.content,
-                'attachment_arr': json.loads(notification.attachment_arr)
+                'attachment_arr': json.loads(notification.attachment_arr),
+                'notification_type': notification.notification_type
             }
             result['status'] = 0
     except Exception as e:
@@ -599,7 +603,23 @@ def changeNotificationStatus(req, **kwargs):
             notification_id = int(data['id'])
             status = int(data['status'])
             notification = models.Notification.objects.get(Q(visible_group=user.group)|Q(visible_group=None), id=notification_id, db_settings=db)
-            models.NotificationStatus.objects.update_or_create(user=user, notification=notification, defaults={'user':user, 'notification': notification, 'status':status})
+            temp = None
+            try:
+                temp = models.NotificationStatus.objects.get(user=user, notification=notification)
+            except:
+                pass
+            if(temp is not None):
+                ## we do not allow changing status if msg already accepted/rejected
+                if(status != temp.status):
+                    if(temp.status >= 2):
+                        if(status >= 2):
+                            raise Exception("User trying to send invalid notifcation status")
+                        else:
+                            pass
+                    else:
+                        models.NotificationStatus.objects.update_or_create(user=user, notification=notification, defaults={'user':user, 'notification': notification, 'status':status})
+            else:
+                models.NotificationStatus.objects.update_or_create(user=user, notification=notification, defaults={'user':user, 'notification': notification, 'status':status})
             result['status'] = 0
     except Exception as e:
         print(e)

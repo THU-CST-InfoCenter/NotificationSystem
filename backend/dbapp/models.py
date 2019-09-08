@@ -77,6 +77,9 @@ class Notification(models.Model):
     visible_group = models.ForeignKey(
         Group, on_delete=models.CASCADE, null=True, default=None)
     time = models.DateTimeField(auto_now_add=True, db_index=True)
+    notification_type = models.PositiveSmallIntegerField(default=0)
+    ## type == 0 => do not require accept/reject
+    ## type == 1 => need accept/reject
     db_settings = models.ForeignKey(DBSettings, on_delete=models.CASCADE)
 
 

@@ -19,12 +19,23 @@
       <el-col :span="5" justify="start">
         <h4>通知的用户组(留空为所有用户可见)</h4>
       </el-col>
+      <el-col :span="8" justify="start">
+        <h4>通知类型</h4>
+      </el-col>
     </el-row>
-    <el-row type="flex" style="margin-top: 15px;">
+    <el-row type="flex" style="margin-top: 15px;" justify="start" align="middle">
       <el-col :span="5" justify="start">
         <el-select clearable v-model="curGroup" placeholder="请选择" style="width: 100%;">
-          <el-option v-for="item in groupList" :key="item.pk" :label="item.groupname" :value="item.pk"></el-option>
+          <el-option
+            v-for="item in groupList"
+            :key="item.pk"
+            :label="item.groupname"
+            :value="item.pk"
+          ></el-option>
         </el-select>
+      </el-col>
+      <el-col :span="8" justify="start">
+        <el-switch v-model="needAcRj" active-text="需要用户接受/拒绝" inactive-text="仅需确认已读"></el-switch>
       </el-col>
     </el-row>
     <el-row type="flex" justify="start" style="margin-top: 30px;">
@@ -66,8 +77,8 @@ export default {
   mixins: [ResChecker],
   methods: {
     onSend() {
-      if(this.fileList.length == 0) {
-        this.onSubmit({})
+      if (this.fileList.length == 0) {
+        this.onSubmit({});
       } else {
         this.$refs.upload.submit();
       }
@@ -115,33 +126,34 @@ export default {
         });
       } else {
         let form = new FormData();
-        if (this.fileList.length > 0) 
-          form.append("file", content.file);
+        if (this.fileList.length > 0) form.append("file", content.file);
         form.append("title", this.title);
         form.append("content", this.content);
         form.append("visible_group_id", this.curGroup);
-        this.$http.post("sendNotification", form, {
-          headers: { "Content-Type": "multipart/form-data" },
-          progress(e) {
-            if (e.lengthComputable) {
-              let percent = (e.loaded / e.total) * 100;
-              if(content.onProgress)
-                content.onProgress({ percent: percent });
+        form.append("notification_type", this.needAcRj ? 1 : 0);
+        this.$http
+          .post("sendNotification", form, {
+            headers: { "Content-Type": "multipart/form-data" },
+            progress(e) {
+              if (e.lengthComputable) {
+                let percent = (e.loaded / e.total) * 100;
+                if (content.onProgress)
+                  content.onProgress({ percent: percent });
+              }
             }
-          }
-        }).then(response => {
-          let res = JSON.parse(response.bodyText);
-          this.resChecker(res, () => {
-            this.$refs.upload.clearFiles();
-            if(content.onSuccess)
-              content.onSuccess();
-            swal({
-              title: "通知发送成功",
-              icon: "success",
-              button: "确定"
-            }).then(v=>this.$router.go(0));
+          })
+          .then(response => {
+            let res = JSON.parse(response.bodyText);
+            this.resChecker(res, () => {
+              this.$refs.upload.clearFiles();
+              if (content.onSuccess) content.onSuccess();
+              swal({
+                title: "通知发送成功",
+                icon: "success",
+                button: "确定"
+              }).then(v => this.$router.go(0));
+            });
           });
-        });
       }
     },
     onClear() {
@@ -161,7 +173,8 @@ export default {
       editor: null,
       isSelfUpdating: true,
       groupList: [],
-      curGroup: ""
+      curGroup: "",
+      needAcRj: false,
     };
   },
   mounted() {

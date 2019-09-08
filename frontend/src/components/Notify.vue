@@ -26,13 +26,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog
-      title="消息内容"
-      :visible.sync="dialogVisible"
-      width="80%"
-      :close-on-click-modal="isAdmin"
-      :show-close="isAdmin"
-    >
+    <el-dialog title="消息内容" :visible.sync="dialogVisible" width="80%" :before-close="handleDetailClose">
       <el-row>
         <div class="innerHtml">
           <span v-html="msgContent"></span>
@@ -51,10 +45,9 @@
       <span slot="footer" class="dialog-footer">
         <el-button v-if="isAdmin" type="primary" @click="dialogVisible = false">确 定</el-button>
         <div v-if="!isAdmin">
-          <el-button @click="dialogVisible = false">取 消</el-button>
-          <el-button type="primary" @click="changeStatus(1)">确认已读</el-button>
-          <el-button type="success" @click="changeStatus(2)">接受</el-button>
-          <el-button type="danger" @click="changeStatus(3)">拒绝</el-button>
+          <el-button type="primary" @click="handleDetailClose">确 定</el-button>
+          <el-button type="success" v-if="needAcRj && !operation_disabled" @click="changeStatus(2)">接受</el-button>
+          <el-button type="danger" v-if="needAcRj && !operation_disabled" @click="changeStatus(3)">拒绝</el-button>
         </div>
       </span>
     </el-dialog>
@@ -72,6 +65,7 @@
               background
               layout="prev, pager, next"
               :page-count="numPages"
+              :current-page.sync="curPage"
               @current-change="handlePageChange"
             ></el-pagination>
           </el-col>
@@ -133,6 +127,8 @@ export default {
       tableData: [],
       dialogVisible: false,
       dialogAdminVisible: false,
+      operation_disabled: false,
+      needAcRj: false,
       msgContent: "",
       msgId: 0,
       msgAttachment: [],
@@ -163,7 +159,9 @@ export default {
         ],
         tableData: []
       },
-      numPages: 0
+      numPages: 0,
+      curPage: 0,
+      isRead: false,
     };
   },
   created() {
@@ -181,19 +179,58 @@ export default {
   },
   components: { List },
   methods: {
+    handleDetailClose() {
+      this.dialogVisible = false;
+      if(!this.isAdmin && !this.isRead)
+        this.changeStatus(1);
+    },
     changeStatus(status) {
-      this.$http
-        .post("changeNotificationStatus", { id: this.msgId, status: status })
-        .then(res => {
-          this.resChecker(res.body, () => {
-            this.dialogVisible = false;
-            this.tableData.forEach(e => {
-              if (e.id === this.msgId) {
-                e.status = MSG_STATUS_ARR[status];
-              }
+      if (status >= 2) {
+        swal({
+          title: "请确认",
+          text: "接受/拒绝后将无法修改，请确认操作",
+          icon: "warning",
+          buttons: {
+            cancel: "取消",
+            confirm: {
+              text: "确定",
+              value: "confirm",
+            },
+          }
+        }).then(val => {
+          if (val == "confirm") {
+            this.$http
+              .post("changeNotificationStatus", {
+                id: this.msgId,
+                status: status
+              })
+              .then(res => {
+                this.resChecker(res.body, () => {
+                  this.isRead = true;
+                  this.handleDetailClose();
+                  this.tableData.forEach(e => {
+                    if (e.id === this.msgId) {
+                      e.status = MSG_STATUS_ARR[status];
+                    }
+                  });
+                });
+              });
+          }
+        });
+      } else {
+        this.$http
+          .post("changeNotificationStatus", { id: this.msgId, status: status })
+          .then(res => {
+            this.resChecker(res.body, () => {
+              this.dialogVisible = false;
+              this.tableData.forEach(e => {
+                if (e.id === this.msgId) {
+                  e.status = MSG_STATUS_ARR[status];
+                }
+              });
             });
           });
-        });
+      }
     },
     downloadAttachment(fname) {
       this.$http
@@ -265,10 +302,15 @@ export default {
           )
           .then(response => {
             this.resChecker(response.body, () => {
+              this.needAcRj = response.body.data.notification_type == 1;
               this.msgContent = response.body.data.content;
               if (response.body.data.attachment_arr.length > 0)
                 this.msgAttachment = response.body.data.attachment_arr;
               this.msgId = row.id;
+              if (!this.isAdmin) {
+                this.operation_disabled = (row.status_id >= 2);
+                this.isRead = row.status_id >= 1;
+              }
             });
           })
           .catch(res => console.log(res));
@@ -289,6 +331,7 @@ export default {
       // fetch and set data
       this.msgDetailModel.tableData = [];
       this.msgId = row.id;
+      this.curPage = 1;
       this.handlePageChange(1);
       this.dialogAdminVisible = true;
     },
