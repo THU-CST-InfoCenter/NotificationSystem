@@ -100,6 +100,7 @@
 /* eslint-disable */
 import List from "./UneditableList";
 import ResChecker from "../api/common";
+import CONFIG from "../config";
 
 const MSG_STATUS_ARR = [
   {
@@ -233,40 +234,14 @@ export default {
       }
     },
     downloadAttachment(fname) {
-      this.$http
-        .post(
-          this.isAdmin ? "downloadAttachmentAdmin" : "downloadAttachmentUser",
-          { id: this.msgId, filename: fname },
-          { responseType: "blob" }
-        )
-        .then(response => {
-          if (response.body.status !== undefined) {
-            if (response.body.status !== 0) {
-              swal({
-                title: "出错了",
-                text: response.body.message,
-                icon: "error",
-                button: "确定"
-              }).then(val => {
-                if (response.body.status === -1) {
-                  that.$router.push("/");
-                }
-              });
-              return;
-            }
-          }
-          const link = document.createElement("a");
-          let blob = new Blob([response.data], {
-            type: "application/octet-stream"
-          });
-          link.style.display = "none";
-          link.href = URL.createObjectURL(blob);
-          link.setAttribute("download", fname);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        })
-        .catch(res => console.log(res));
+      const link = document.createElement("a");
+      link.style.display = "none";
+      link.href = CONFIG.API_URL + (this.isAdmin ? "downloadAttachmentAdmin" : "downloadAttachmentUser") + 
+        "?username=" + window.sessionStorage.username + "&token=" + window.sessionStorage.token + "&id=" + this.msgId + "&filename=" + fname;  
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     },
     getNotify() {
       this.$http

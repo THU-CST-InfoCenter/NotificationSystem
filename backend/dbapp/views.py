@@ -1,5 +1,5 @@
 from functools import wraps
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseServerError
 from django.core import serializers
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
@@ -645,6 +645,9 @@ def getDBList(req, **kwargs):
     finally:
         return JsonResponse(result)
 
+@csrf_exempt
+@check_post
+@check_admin
 def getDB(req, **kwargs):
     result = {'status': 1}
     try:
@@ -961,19 +964,24 @@ def changeUserInfoAdmin(req, **kwargs):
     finally:
         return JsonResponse(result)
 
-@csrf_exempt
-@check_post
-@check_admin
-def downloadAttachmentAdmin(req, **kwargs):
+def downloadAttachmentAdmin(req):
     try:
-        result = {'status': 1}
+        if(req.method != 'GET'):
+            raise Exception("Expected GET request")
+        header_username = req.GET['username']
+        header_token = req.GET['token']
+        user = models.AdminUser.objects.get(username=header_username)
+        if(user.token == header_token
+                and datetime.datetime.utcnow().replace(tzinfo=utc) - user.token_set_time < datetime.timedelta(seconds=token_exp_time)):
+            pass
+        else:
+            raise Exception("Invalid token/username")
         db = getCurrentDB()
         if(db is None):
             raise Exception("No db is selected now")
         else:
-            data = json.loads(req.body)
-            nid = data['id']
-            fname = data['filename']
+            nid = req.GET['id']
+            fname = req.GET['filename']
             notification = models.Notification.objects.get(id=nid, db_settings=db)
             arr = json.loads(notification.attachment_arr)
             if(fname in arr):
@@ -989,37 +997,39 @@ def downloadAttachmentAdmin(req, **kwargs):
                 raise Exception("Invalid filename when trying to download attachment")
     except Exception as e:
         print(e)
-        result['message'] = '操作失败'
-        return JsonResponse(result)
+        return HttpResponseForbidden
 
-@csrf_exempt
-@check_post
-@check_login
-def downloadAttachmentUser(req, **kwargs):
+def downloadAttachmentUser(req):
     try:
-        result = {'status': 1}
+        if(req.method != 'GET'):
+            raise Exception("Expected GET request")
+        header_username = req.GET['username']
+        header_token = req.GET['token']
         db = getCurrentDB()
         if(db is None):
             raise Exception("No db is selected now")
+        user = models.User.objects.get(username=header_username, db_settings=db)
+        token = getToken(user, token_exp_time)
+        if(token == header_token):
+            pass
         else:
-            data = json.loads(req.body)
-            user = kwargs['__user']
-            nid = data['id']
-            fname = data['filename']
-            notification = models.Notification.objects.get(id=nid, db_settings=db)
-            arr = json.loads(notification.attachment_arr)
-            if(notification.visible_group is not None and notification.visible_group != user.group):
-                raise Exception("Unauthorized user found when trying to download attachment")
-            if(fname in arr):
-                response = HttpResponse(content_type='application/octet-stream')
-                response['Content-Disposition'] = 'attachment;filename=' + fname
-                with open(os.path.join(data_dir, str(notification.id) + "_" + notification.title + "_" + fname), 'rb') as fin:
-                    data = BytesIO(fin.read())
-                    data.seek(0)
-                    response.write(data.getvalue())
-                    return response
-            else:
-                raise Exception("Invalid filename when trying to download attachment")
+            raise Exception("Invalid token/username")
+        nid = req.GET['id']
+        fname = req.GET['filename']
+        notification = models.Notification.objects.get(id=nid, db_settings=db)
+        arr = json.loads(notification.attachment_arr)
+        if(notification.visible_group is not None and notification.visible_group != user.group):
+            raise Exception("Unauthorized user found when trying to download attachment")
+        if(fname in arr):
+            response = HttpResponse(content_type='application/octet-stream')
+            response['Content-Disposition'] = 'attachment;filename=' + fname
+            with open(os.path.join(data_dir, str(notification.id) + "_" + notification.title + "_" + fname), 'rb') as fin:
+                data = BytesIO(fin.read())
+                data.seek(0)
+                response.write(data.getvalue())
+                return response
+        else:
+            raise Exception("Invalid filename when trying to download attachment")
     except Exception as e:
         print(e)
-        result['message'] = '操作失败'
+        return HttpResponseForbidden
