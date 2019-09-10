@@ -1,0 +1,6 @@
+const CONFIG = { API_URL: 'http://127.0.0.1:8000/',
+  ROUTER_BASE_URL: '/'}
+
+export default CONFIG
+
+https://stu.cs.tsinghua.edu.cn/app/notification/api

@@ -8,7 +8,7 @@ import App from './App'
 import router from './router'
 import swal from 'sweetalert'
 import 'element-ui/lib/theme-chalk/index.css'
-import API_URL from './config'
+import CONFIG from './config'
 
 
 Vue.use(ElementUI)
@@ -16,7 +16,7 @@ Vue.use(VueResource)
 Vue.use(VueObserveVisibility)
 Vue.use(Router)
 Vue.config.productionTip = false
-Vue.http.options.root = API_URL
+Vue.http.options.root = CONFIG.API_URL
 Vue.http.options.credentials = true
 Vue.http.interceptors.push(function(req, next) {
   req.headers.set('X-Access-Token', window.sessionStorage.token)

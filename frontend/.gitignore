@@ -1,4 +1,5 @@
 .DS_Store
+/src/config.js
 node_modules/
 /dist/
 npm-debug.log*

@@ -8,6 +8,7 @@ import SendNotify from '@/components/SendNotify'
 import UserSettings from '@/components/UserSettings'
 import DBSettings from '@/components/DBSettings'
 import GroupSettings from '@/components/GroupSettings'
+import CONFIG from '../config'
 
 const beforeEachHook = (to, from, next) => {
   if (to.meta.title) {
@@ -39,6 +40,7 @@ const adminMeta = {
 
 const router = new Router({
   mode: 'history',
+  base: CONFIG.ROUTER_BASE_URL,
   routes: [
     {
       path: '/',
