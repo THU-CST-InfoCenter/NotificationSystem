@@ -103,7 +103,7 @@ def file_cleanup(sender, instance, *args, **kwargs):
         attachments = json.loads(instance.attachment_arr)
         for f in attachments:
             try:
-                os.remove(os.path.join(data_dir, f))
+                os.remove(os.path.join(data_dir, str(instance.id) + "_" + str(instance.title) + "_" + f))
             except Exception as e:
                 print(e)
     except Exception as e:

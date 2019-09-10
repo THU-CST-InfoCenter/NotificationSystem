@@ -508,16 +508,18 @@ def sendNotification(req, **kwargs):
             if(visible_group_id_str != ''):
                 visible_group = models.Group.objects.get(id=int(visible_group_id_str))
             attachments = []
+            notification = models.Notification.objects.create(
+                title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group, notification_type=notification_type)
             if f is not None:
                 f.seek(0)
                 attachments.append(f.name)
-                pathlib.Path(data_dir).mkdir(parents=True, exist_ok=True) 
-                fdir = os.path.join(data_dir, f.name)
+                pathlib.Path(data_dir).mkdir(parents=True, exist_ok=True)
+                fdir = os.path.join(data_dir, str(notification.id) + "_" + title + "_" + f.name)
                 with open(fdir, 'wb+') as destination:
                     for chunk in f.chunks():
                         destination.write(chunk)
-            notification = models.Notification.objects.create(
-                title=title, content=content, attachment_arr=json.dumps(attachments), db_settings=db, visible_group=visible_group, notification_type=notification_type)
+            notification.attachment_arr = json.dumps(attachments)
+            notification.save(force_update=True)
             if(visible_group is not None):
                 users = models.User.objects.filter(group=visible_group, db_settings=db)
             else:
@@ -978,7 +980,7 @@ def downloadAttachmentAdmin(req, **kwargs):
                 response = HttpResponse(content_type='application/octet-stream')
                 response['Content-Disposition'] = 'attachment;filename="{}"'.format(fname)
                 response['Access-Control-Expose-Headers'] = 'Content-Disposition'
-                with open(os.path.join(data_dir, fname), 'rb') as fin:
+                with open(os.path.join(data_dir, str(notification.id) + "_" + notification.title + "_" + fname), 'rb') as fin:
                     data = BytesIO(fin.read())
                     data.seek(0)
                     response.write(data.getvalue())
@@ -1011,7 +1013,7 @@ def downloadAttachmentUser(req, **kwargs):
             if(fname in arr):
                 response = HttpResponse(content_type='application/octet-stream')
                 response['Content-Disposition'] = 'attachment;filename=' + fname
-                with open(os.path.join(data_dir, fname), 'rb') as fin:
+                with open(os.path.join(data_dir, str(notification.id) + "_" + notification.title + "_" + fname), 'rb') as fin:
                     data = BytesIO(fin.read())
                     data.seek(0)
                     response.write(data.getvalue())

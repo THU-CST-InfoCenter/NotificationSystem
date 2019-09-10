@@ -1,4 +1,3 @@
-hostname = 'http://127.0.0.1:8080'
 token_exp_time = 900 # in seconds
 
 data_dir = './data/'  ## file upload/download data dir
